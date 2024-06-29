@@ -1,0 +1,8 @@
+VIM="nvim"
+
+source $HOME/.config/env
+
+addToPathFront $HOME/.local/bin
+
+# Where should I put you?
+bindkey -s ^f "tmux-sessionizer\n"

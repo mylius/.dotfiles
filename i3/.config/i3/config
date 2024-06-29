@@ -62,6 +62,12 @@ bindsym $mod+d exec --no-startup-id dmenu_run
 # .desktop file. It is a wrapper around dmenu, so you need that installed.
 # bindcode $mod+40 exec --no-startup-id i3-dmenu-desktop
 
+# app assignment
+assign [class="Firefox"] 2
+
+# startup apsp
+exec --no-startup-id firefox
+
 # change focus
 bindsym $mod+j focus left
 bindsym $mod+k focus down
@@ -115,9 +121,9 @@ bindsym $mod+a focus parent
 # Define names for default workspaces for which we configure key bindings later on.
 # We use variables to avoid repeating the names in multiple places.
 set $ws1 "1"
-set $ws2 "2"
+set $ws2 "2: Firefox"
 set $ws3 "3"
-set $ws4 "4"
+set $ws4 "4: Terminal"
 set $ws5 "5"
 set $ws6 "6"
 set $ws7 "7"
@@ -183,8 +189,37 @@ mode "resize" {
 
 bindsym $mod+r mode "resize"
 
+# colors
+
+# Color shemes for windows 
+set $bgcolor    #523d6499
+set $in-bgcolor #3636364D
+set $text       #ffffff
+set $u-bgcolor  #ff0000
+set $indicator  #a8a3c1
+set $in-text    #969696
+set $bgcolor    #523d6499
+set $in-bgcolor #3636364D
+#                       border          background      text            indicator (a line which shows where the next window will be placed)     
+client.focused          $bgcolor        $bgcolor        $text           $indicator
+client.unfocused        $in-bgcolor     $in-bgcolor     $in-text        $in-bgcolor
+client.focused_inactive $in-bgcolor     $in-bgcolor     $in-text        $in-bgcolor
+client.urgent           $u-bgcolor      $u-bgcolor      $text           $u-bgcolor
+
+
 # Start i3bar to display a workspace bar (plus the system information i3status
 # finds out, if available)
 bar {
-        status_command i3status
+        status_command i3status 
+        colors {
+                background $bgcolor
+                separator #191919
+                #                       border          background      text
+                focused_workspace       $bgcolor        $bgcolor        $text
+                inactive_workspace      $in-bgcolor     $in-bgcolor     $text
+                urgent_workspace        $u-bgcolor      $u-bgcolor      $text   
+
+        }
+        i3bar_command i3bar --transparency
+        tray_output none
 }
