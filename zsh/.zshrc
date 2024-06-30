@@ -100,6 +100,7 @@ source $ZSH/oh-my-zsh.sh
 # alias zshconfig="mate ~/.zshrc"
 # alias ohmyzsh="mate ~/.oh-my-zsh"
 export PATH=~/miniconda3/bin:$PATH
+source ~/.zsh_profile
 #
 
 # >>> conda initialize >>>
