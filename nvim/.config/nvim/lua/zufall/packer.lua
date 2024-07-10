@@ -18,9 +18,12 @@ use "olimorris/onedarkpro.nvim"
 
 use ('nvim-treesitter/nvim-treesitter', {run= ':TSUpdate'})
 use ('theprimeagen/harpoon')
+use ('ThePrimeagen/vim-be-good')
 use ('mbbill/undotree')
 use ('tpope/vim-fugitive')
 use ('mfussenegger/nvim-dap')
+use ('mfussenegger/nvim-dap-python')
+use ('mfussenegger/nvim-dap-ui')
 use ('github/copilot.vim')
 use {
   'VonHeikemen/lsp-zero.nvim',
@@ -48,3 +51,4 @@ use {
   }
 }
 end)
+
