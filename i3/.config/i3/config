@@ -24,6 +24,10 @@ font pango:monospace 8
 exec --no-startup-id dex --autostart --environment i3
 
 
+#exec XmodMap
+exec --no.startup-id setxkbmap -optoin
+exec --no-startup-id xmodmap .Xmodmap
+
 # The combination of xss-lock, nm-applet and pactl is a popular choice, so
 # they are included here as an example. Modify as you see fit.
 
@@ -64,10 +68,12 @@ bindsym $mod+d exec --no-startup-id dmenu_run
 # bindcode $mod+40 exec --no-startup-id i3-dmenu-desktop
 
 # app assignment
-assign [class="Firefox"] $ws2 
+assign [class="firefox"] $ws2 
+assign [class="Alacritty"] $ws4 
 
 # startup apsp
 exec --no-startup-id firefox
+exec --no-startup-id alacritty
 
 # change focus
 bindsym $mod+j focus left
@@ -226,6 +232,3 @@ bar {
 }
 
 
-#exec XmodMap
-exec --no.startup-id setxkbmap -optoin
-exec --no-startup-id xmodmap .Xmodmap

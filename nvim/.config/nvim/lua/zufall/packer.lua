@@ -18,7 +18,7 @@ use "olimorris/onedarkpro.nvim"
 
 use ('nvim-treesitter/nvim-treesitter', {run= ':TSUpdate'})
 use ('theprimeagen/harpoon')
-use ('ThePrimeagen/vim-be-good')
+use ('theprimeagen/vim-be-good')
 use ('mbbill/undotree')
 use ('tpope/vim-fugitive')
 use ('mfussenegger/nvim-dap')
