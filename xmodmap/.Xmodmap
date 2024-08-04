@@ -2,12 +2,12 @@
 
 ! Key bindings for number row
 keycode  10 = exclam 1 exclam 1
-keycode  11 = quotedbl 2 quotedbl 2
-keycode  12 = parenleft 3 parenleft 3
+keycode  11 = quotedbl 2 quotedbl 2 twosuperior
+keycode  12 = parenleft 3 parenleft 3 threesuperior
 keycode  13 = parenright 4 dollar parenright dollar
 keycode  14 = bracketleft 5 percent bracketleft percent
 keycode  15 = bracketright 6 ampersand bracketright ampersand
-keycode  16 = slash 7 slash 7
+keycode  16 = slash 7 slash 7 backslash
 keycode  17 = braceleft 8 braceleft 8
 keycode  18 = braceright 9 braceright 9
 keycode  19 = equal 0 equal 0

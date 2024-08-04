@@ -34,7 +34,7 @@ require'nvim-treesitter.configs'.setup {
 }
 
 require("mason-null-ls").setup({
-  ensure_installed = { "black" }
+  ensure_installed = { "black","gofmt" }
 })
 
 local null_ls = require("null-ls")
@@ -46,7 +46,7 @@ null_ls.setup({
 })
 
 require('mason-lspconfig').setup({
-  ensure_installed = {'tsserver', 'rust_analyzer','ruff', 'pyright'},
+  ensure_installed = {'tsserver', 'rust_analyzer','ruff', 'pyright','gopls'},
   handlers = {
     function(server_name)
       require('lspconfig')[server_name].setup({
