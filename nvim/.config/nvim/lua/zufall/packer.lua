@@ -23,7 +23,7 @@ use ('mbbill/undotree')
 use ('tpope/vim-fugitive')
 use ('mfussenegger/nvim-dap')
 use ('mfussenegger/nvim-dap-python')
-use ('mfussenegger/nvim-dap-ui')
+use { "rcarriga/nvim-dap-ui", requires = {"mfussenegger/nvim-dap", "nvim-neotest/nvim-nio"} }
 use ('github/copilot.vim')
 use {
   'VonHeikemen/lsp-zero.nvim',
