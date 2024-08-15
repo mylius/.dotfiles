@@ -23,13 +23,13 @@ use ('mbbill/undotree')
 use ('tpope/vim-fugitive')
 use ('mfussenegger/nvim-dap')
 use ('mfussenegger/nvim-dap-python')
-use ('mfussenegger/nvim-dap-ui')
 use {
   "supermaven-inc/supermaven-nvim",
   config = function()
     require("supermaven-nvim").setup({})
   end,
 }
+use { "rcarriga/nvim-dap-ui", requires = {"mfussenegger/nvim-dap", "nvim-neotest/nvim-nio"} }
 use {
   'VonHeikemen/lsp-zero.nvim',
   branch = 'v3.x',
