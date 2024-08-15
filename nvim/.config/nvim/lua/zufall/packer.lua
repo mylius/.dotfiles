@@ -24,7 +24,12 @@ use ('tpope/vim-fugitive')
 use ('mfussenegger/nvim-dap')
 use ('mfussenegger/nvim-dap-python')
 use ('mfussenegger/nvim-dap-ui')
-use ('github/copilot.vim')
+use {
+  "supermaven-inc/supermaven-nvim",
+  config = function()
+    require("supermaven-nvim").setup({})
+  end,
+}
 use {
   'VonHeikemen/lsp-zero.nvim',
   branch = 'v3.x',
