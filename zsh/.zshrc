@@ -105,6 +105,15 @@ export PATH="$PATH:/home/zufall/.zig/zig-linux-x86_64-0.14.0-dev.349+e82f7d380"
 source ~/.zsh_profile
 #
 
+#git functions
+function git_clean_up(){
+	git fetch -p
+	for branch in $(git branch -vv | grep ': gone]' | awk '{print $1}');
+	do 
+		git branch -D $branch;
+	done
+}
+
 # >>> conda initialize >>>
 # !! Contents within this block are managed by 'conda init' !!
 __conda_setup="$('/Users/mylius/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"

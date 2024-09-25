@@ -34,7 +34,7 @@ require'nvim-treesitter.configs'.setup {
 }
 
 require("mason-null-ls").setup({
-  ensure_installed = { "black","gofmt" }
+  ensure_installed = { "black","gofmt", "zig fmt" }
 })
 
 local null_ls = require("null-ls")
@@ -71,6 +71,23 @@ require('mason-lspconfig').setup({
             }
           }
         }
+      })
+    end,
+    pyright = function()
+      require('lspconfig').pyright.setup({
+        capabilities = lsp_capabilities,
+        settings = {
+          python = {
+            analysis = {
+              autoSearchPaths = true,
+              useLibraryCodeForTypes = true,
+              diagnosticMode = "workspace"
+            }
+          }
+        },
+        on_attach = function(client, bufnr)
+          -- You can add any additional on_attach functions here
+        end,
       })
     end,
   }
