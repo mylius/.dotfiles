@@ -27,8 +27,7 @@ TERM = "xterm-256color"
 [window]
 decorations = "full"
 dynamic_title = true
-option_as_alt = "Both"
-#startup_mode = "Maximized"
+startup_mode = "Maximized"
 
 
 [font.bold]
