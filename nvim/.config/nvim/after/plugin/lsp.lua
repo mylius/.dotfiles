@@ -34,7 +34,7 @@ require'nvim-treesitter.configs'.setup {
 }
 
 require("mason-null-ls").setup({
-  ensure_installed = { "black","gofmt", "zig fmt" }
+  ensure_installed = { "black","gofmt", "zig fmt","debugpy" }
 })
 
 local null_ls = require("null-ls")
