@@ -22,14 +22,45 @@ use ('theprimeagen/vim-be-good')
 use ('mbbill/undotree')
 use ('tpope/vim-fugitive')
 use ('mfussenegger/nvim-dap')
-use ('mfussenegger/nvim-dap-python')
+ususe {'mfussenegger/nvim-dap-python'}
+e {'mfussenegger/nvim-dap-python',
+  requires = {"mfussenegger/nvim-dap", "rcarriga/nvim-dap-ui"},
+  config = function()
+    local dap_python = require("dap-python")
+    
+    -- Function to find the Python path
+    local function get_python_path()
+      local cwd = vim.fn.getcwd()
+      if vim.fn.executable(cwd .. '/venv/bin/python') == 1 then
+        return cwd .. '/venv/bin/python'
+      elseif vim.fn.executable(cwd .. '/.venv/bin/python') == 1 then
+        return cwd .. '/.venv/bin/python'
+      else
+        return '~/miniconda3/envs/zufall/bin/python'
+      end
+    end
+
+    -- Setup dap-python
+    dap_python.setup(get_python_path())
+
+    -- Set Python path for debugging
+    table.insert(require('dap').configurations.python, {
+      type = 'python',
+      request = 'launch',
+      name = 'Python: Current File',
+      program = '${file}',
+      pythonPath = get_python_path,
+    })
+  end
+}
+
 use {
   "supermaven-inc/supermaven-nvim",
   config = function()
     require("supermaven-nvim").setup({})
   end,
 }
-use { "rcarriga/nvim-dap-ui", requires = {"mfussenegger/nvim-dap", "nvim-neotest/nvim-nio"} }
+use { "rcarriga/nvim-dap-ui", requires = {"mfussenegger/nvim-dap", "nvim-neotest/nvim-nio"}} 
 use {
   'VonHeikemen/lsp-zero.nvim',
   branch = 'v3.x',
