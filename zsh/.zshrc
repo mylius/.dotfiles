@@ -171,3 +171,6 @@ eval "$(conda shell.bash hook)"
 . "/Users/mylius/.deno/env"export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 alias GET_CONTEXT="~/projects/context_getter/get_context.sh"
+export PATH=$PATH:$(go env GOPATH)/bin
+
+. "/Users/mylius/.deno/env"
