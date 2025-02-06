@@ -171,3 +171,26 @@ eval "$(conda shell.bash hook)"
 . "/Users/mylius/.deno/env"export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 alias GET_CONTEXT="~/projects/context_getter/get_context.sh"
+export PATH="/opt/local/bin:$PATH"
+
+# pnpm
+export PNPM_HOME="/Users/mylius/Library/pnpm"
+case ":$PATH:" in
+  *":$PNPM_HOME:"*) ;;
+  *) export PATH="$PNPM_HOME:$PATH" ;;
+esac
+# pnpm end
+
+
+
+figlet() {
+    echo
+    echo
+    command figlet -w $(tput cols) -c "$@"
+    echo
+    echo
+}
+
+retro() {
+(echo;echo;echo; echo "HARIvederci"; echo; echo "See ✌️you!"; echo; echo;) | figlet -f 3D | dotacat
+}
