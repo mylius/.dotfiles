@@ -194,3 +194,7 @@ figlet() {
 retro() {
 (echo;echo;echo; echo "HARIvederci"; echo; echo "See ✌️you!"; echo; echo;) | figlet -f 3D | dotacat
 }
+
+export PATH=$PATH:$(go env GOPATH)/bin
+
+. "/Users/mylius/.deno/env"
