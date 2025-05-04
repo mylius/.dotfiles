@@ -1,0 +1,9 @@
+theme = OneDark
+macos-titlebar-proxy-icon = hidden
+shell-integration = none
+macos-titlebar-style = hidden
+title = " "
+background-opacity=0.85
+background-blur=true
+window-padding-x=4
+# custom-shader = ghostty-shaders/in-game-crt.glsl

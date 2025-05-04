@@ -16,11 +16,23 @@ return require('packer').startup(function(use)
 
 use "olimorris/onedarkpro.nvim"
 use ('nvim-treesitter/nvim-treesitter', {run= ':TSUpdate'})
+use 'nvim-treesitter/nvim-treesitter-refactor'
 use ('theprimeagen/harpoon')
 use ('theprimeagen/vim-be-good')
 use ('mbbill/undotree')
 use ('tpope/vim-fugitive')
 use ('airblade/vim-gitgutter')
+use {
+  'f-person/git-blame.nvim',
+  config = function()
+    require('gitblame').setup {
+      enabled = true,
+      date_format = '%r',
+      message_template = '  <author> • <date> • <summary>',
+      highlight_group = "LineNr",
+    }
+  end
+}
 use {"folke/todo-comments.nvim", requires = "nvim-lua/plenary.nvim"}
 use {
   'mikavilpas/yazi.nvim',

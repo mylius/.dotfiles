@@ -1,5 +1,5 @@
 require("yazi").setup({
-    open_for_directories = true,
+    open_for_directories = false,
 
     use_ya_for_events_reading = false,
 

@@ -4,10 +4,33 @@ local lsp = require('lsp-zero')
 lsp.extend_lspconfig()
 
 
+-- Create highlight groups for references
+vim.api.nvim_create_autocmd('ColorScheme', {
+  group = vim.api.nvim_create_augroup('custom_highlights', {clear = true}),
+  callback = function()
+    vim.api.nvim_set_hl(0, 'LspReferenceText', { bg = '#3b3b3b' })
+    vim.api.nvim_set_hl(0, 'LspReferenceRead', { bg = '#3b3b3b' })
+    vim.api.nvim_set_hl(0, 'LspReferenceWrite', { bg = '#3b3b3b' })
+  end
+})
+
 vim.api.nvim_create_autocmd('LspAttach', {
   group = vim.api.nvim_create_augroup('user_lsp_attach', {clear = true}),
   callback = function(event)
     local opts = {buffer = event.buf}
+    
+    -- Enable document highlight
+    local client = vim.lsp.get_client_by_id(event.data.client_id)
+    if client.server_capabilities.documentHighlightProvider then
+      vim.api.nvim_create_autocmd({ 'CursorHold', 'CursorHoldI' }, {
+        buffer = event.buf,
+        callback = vim.lsp.buf.document_highlight,
+      })
+      vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
+        buffer = event.buf,
+        callback = vim.lsp.buf.clear_references,
+      })
+    end
 
     vim.keymap.set('n', 'gd', function() vim.lsp.buf.definition() end, opts)
     vim.keymap.set('n', 'gr', function() vim.lsp.buf.references() end, opts)
@@ -20,7 +43,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
     vim.keymap.set('n', '<leader>vrr', function() vim.lsp.buf.references() end, opts)
     vim.keymap.set('n', '<leader>vrn', function() vim.lsp.buf.rename() end, opts)
     vim.keymap.set('i', '<C-h>', function() vim.lsp.buf.signature_help() end, opts)
-  end,
+  end
 })
 
 local lsp_capabilities = require('cmp_nvim_lsp').default_capabilities()
@@ -145,6 +168,80 @@ require('mason-lspconfig').setup({
             client.server_capabilities.definitionProvider = true
         end,
     })
+    end,
+
+    rust_analyzer = function()
+      require('lspconfig').rust_analyzer.setup({
+        capabilities = lsp_capabilities,
+        settings = {
+          ['rust-analyzer'] = {
+            checkOnSave = {
+              command = "clippy",
+              extraArgs = {"--", "-W", "clippy::pedantic"}
+            },
+            cargo = {
+              allFeatures = true,
+              loadOutDirsFromCheck = true,
+              runBuildScripts = true,
+            },
+            procMacro = {
+              enable = true,
+              attributes = {
+                enable = true
+              }
+            },
+            diagnostics = {
+              enable = true,
+              experimental = {
+                enable = true,
+              },
+            },
+            lens = {
+              enable = true,
+              methodReferences = true,
+              references = true,
+            },
+            completion = {
+              fullFunctionSignatures = {
+                enable = true,
+              },
+            },
+            inlayHints = {
+              bindingModeHints = {
+                enable = true,
+              },
+              closureReturnTypeHints = {
+                enable = "always"
+              },
+              discriminantHints = {
+                enable = "always"
+              },
+              expressionAdjustmentHints = {
+                enable = "always"
+              },
+              lifetimeElisionHints = {
+                enable = "always",
+                useParameterNames = true,
+              },
+              typeHints = {
+                enable = true,
+                hideClosureInitialization = false,
+                hideNamedConstructor = false,
+              },
+            },
+          }
+        },
+        on_attach = function(client, bufnr)
+          -- Enable inlay hints
+          client.server_capabilities.documentFormattingProvider = true
+          vim.api.nvim_create_autocmd("BufWritePre", {
+            buffer = bufnr,
+            callback = function()
+              vim.lsp.buf.format({ bufnr = bufnr })
+            end,
+          })
+        end,
+      })
     end,
 
     -- Svelte configuration

@@ -68,13 +68,33 @@ require("todo-comments").setup({
 
   }
 )
+
+-- Override directory open behavior with Telescope
+vim.api.nvim_create_autocmd("VimEnter", {
+    callback = function()
+        local directory = vim.fn.expand('%:p')
+        if vim.fn.isdirectory(directory) == 1 then
+            require('telescope.builtin').find_files({ cwd = directory })
+        end
+    end
+})
+
+
+
 vim.cmd("colorscheme onedark")
 vim.opt.clipboard:append('unnamedplus')
 vim.api.nvim_set_hl(0, 'Normal', { bg = 'none' })
 vim.api.nvim_set_hl(0, 'NormalFloat', { bg = 'none' })
 vim.api.nvim_set_hl(0, 'FloatBorder', { bg = 'none' })
 vim.api.nvim_set_hl(0, 'Pmenu', { bg = 'none' })
-vim.api.nvim_set_hl(0, 'Visual', { bg = 'none' })
+vim.api.nvim_set_hl(0, 'Visual', { bg = '#3e4452' })
 vim.api.nvim_set_hl(0, 'LineNrAbove', { fg='#51B3EC', bg='none', bold=true })
 vim.api.nvim_set_hl(0, 'LineNr', { fg='white', bg='none', bold=true })
 vim.api.nvim_set_hl(0, 'LineNrBelow', { fg='#FB508F', bg='none', bold=true })
+
+
+vim.cmd([[
+  autocmd BufReadPost,FileReadPost,BufNewFile,BufEnter * call system("tmux rename-window " . expand("%:t"))
+  autocmd VimLeave * call system("tmux setw automatic-rename")
+]])
+
