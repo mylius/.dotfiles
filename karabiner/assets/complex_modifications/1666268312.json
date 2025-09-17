@@ -1,0 +1,1 @@
+{"title":"force cmd click","rules":[{"description":" Left Click to cmd + Left Click","manipulators":[{"type":"basic","from":{"pointing_button":"button1"},"to":[{"pointing_button":"button1","modifiers":["left_gui"]}]}]}]}

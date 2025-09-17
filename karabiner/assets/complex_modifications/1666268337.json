@@ -1,0 +1,1 @@
+{"title":"force ctrl click","rules":[{"description":" Left Click to ctrl + Left Click","manipulators":[{"type":"basic","from":{"pointing_button":"button1"},"to":[{"pointing_button":"button1","modifiers":["left_control"]}]}]}]}
