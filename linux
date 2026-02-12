@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 if [[ -z $STOW_FOLDERS ]]; then
-    STOW_FOLDERS="bin,bash,i3,tmux,zsh,xmodmap,env,alacritty"
+    STOW_FOLDERS="bin,bash,cursor,agents,i3,nvim,tmux,zsh,xmodmap,env,alacritty"
 fi
 
 SCRIPT_DIR=${0:A:h}
