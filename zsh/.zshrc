@@ -1,10 +1,16 @@
 # Basic environment setup
 export PATH="/usr/local/opt/libpq/bin:$PATH"
-export PATH=~/miniconda3/bin:$PATH
 export PATH="$PATH:/home/zufall/.zig/zig-linux-x86_64-0.14.0-dev.349+e82f7d380"
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="/opt/local/bin:$PATH"
 export PATH=$PATH:$(go env GOPATH)/bin
+
+for conda_root in "$HOME/miniforge3" "$HOME/miniconda3"; do
+    if [ -d "$conda_root/bin" ]; then
+        export PATH="$conda_root/bin:$PATH"
+        break
+    fi
+done
 
 # pnpm configuration
 export PNPM_HOME="/Users/mylius/Library/pnpm"
@@ -35,17 +41,27 @@ retro() {
 }
 
 # Conda initialization
-__conda_setup="$('/Users/mylius/miniconda3/bin/conda' 'shell.zsh' 'hook' 2> /dev/null)"
-if [ $? -eq 0 ]; then
-    eval "$__conda_setup"
-else
-    if [ -f "/Users/mylius/miniconda3/etc/profile.d/conda.sh" ]; then
-        . "/Users/mylius/miniconda3/etc/profile.d/conda.sh"
+CONDA_ROOT=""
+for candidate in "$HOME/miniforge3" "$HOME/miniconda3"; do
+    if [ -x "$candidate/bin/conda" ]; then
+        CONDA_ROOT="$candidate"
+        break
+    fi
+done
+
+if [ -n "$CONDA_ROOT" ]; then
+    __conda_setup="$("$CONDA_ROOT/bin/conda" 'shell.zsh' 'hook' 2> /dev/null)"
+    if [ $? -eq 0 ]; then
+        eval "$__conda_setup"
     else
-        export PATH="/Users/mylius/miniconda3/bin:$PATH"
+        if [ -f "$CONDA_ROOT/etc/profile.d/conda.sh" ]; then
+            . "$CONDA_ROOT/etc/profile.d/conda.sh"
+        else
+            export PATH="$CONDA_ROOT/bin:$PATH"
+        fi
     fi
 fi
-unset __conda_setup
+unset __conda_setup CONDA_ROOT
 
 # Deno configuration
 . "/Users/mylius/.deno/env"
