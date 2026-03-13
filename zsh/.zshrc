@@ -53,5 +53,34 @@ unset __conda_setup
 # Initialize zoxide
 eval "$(zoxide init zsh)"
 
+alias lg='lazygit'
+
+if command -v atuin >/dev/null 2>&1; then
+    eval "$(atuin init zsh)"
+fi
+
+if [ -f "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh" ]; then
+    source "$HOME/.zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
+fi
+
+if [ -f "$HOME/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]; then
+    source "$HOME/.zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+fi
+
+killport() {
+    if [ -z "$1" ]; then
+        echo "Usage: killport <port>"
+        return 1
+    fi
+    local pids
+    pids=$(lsof -ti :"$1" 2>/dev/null)
+    if [ -z "$pids" ]; then
+        echo "No processes found on port $1"
+        return 0
+    fi
+    echo "$pids" | xargs kill -9
+    echo "Killed processes on port $1: $pids"
+}
+
 # Initialize starship (this must be at the end of the file)
 eval "$(starship init zsh)"

@@ -1,10 +1,10 @@
 #!/usr/bin/env zsh
 if [[ -z $STOW_FOLDERS ]]; then
-    STOW_FOLDERS="bin,i3,nvim,tmux,zsh,xmodmap,env,alacritty"
+    STOW_FOLDERS="bin,bash,i3,tmux,zsh,xmodmap,env,alacritty"
 fi
 
 if [[ -z $DOTFILES ]]; then
     DOTFILES=$HOME/.dotfiles
 fi
 
-STOW_FOLDERS=$STOW_FOLDERS DOTFILES=$DOTFILES $DOTFILES/install
+STOW_FOLDERS=$STOW_FOLDERS DOTFILES=$DOTFILES "$DOTFILES/install"

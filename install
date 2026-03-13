@@ -1,12 +1,18 @@
 #!/usr/bin/env zsh
-# I am using zsh instead of bash.  I was having some troubles using bash with
-# arrays.  Didn't want to investigate, so I just did zsh
-pushd $DOTFILES
-for folder in $(echo $STOW_FOLDERS | sed "s/,/ /g")
-do
-    echo "stow $folder"
-    stow -D $folder
-    stow $folder
-done
-popd
+set -euo pipefail
 
+if ! command -v stow >/dev/null 2>&1; then
+    echo "stow is required to install dotfiles" >&2
+    exit 1
+fi
+
+: "${DOTFILES:?DOTFILES must be set}"
+: "${STOW_FOLDERS:?STOW_FOLDERS must be set}"
+
+pushd "$DOTFILES" >/dev/null
+for folder in ${(s:,:)STOW_FOLDERS}; do
+    echo "stow $folder"
+    stow -D "$folder"
+    stow "$folder"
+done
+popd >/dev/null
