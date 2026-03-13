@@ -1,18 +1,112 @@
 #!/usr/bin/env zsh
 set -euo pipefail
 
-if ! command -v stow >/dev/null 2>&1; then
-    echo "stow is required to install dotfiles" >&2
-    exit 1
-fi
-
 : "${DOTFILES:?DOTFILES must be set}"
 : "${STOW_FOLDERS:?STOW_FOLDERS must be set}"
 
+backup_target() {
+    local target=$1
+    local rel backup_path
+
+    rel=${target#"$HOME"/}
+    rel=${rel#/}
+
+    if [[ -z ${DOTFILES_BACKUP_DIR:-} ]]; then
+        export DOTFILES_BACKUP_DIR="$HOME/.dotfiles-backups/$(date +%Y%m%d%H%M%S)"
+        mkdir -p "$DOTFILES_BACKUP_DIR"
+        echo "backing up conflicting files to $DOTFILES_BACKUP_DIR" >&2
+    fi
+
+    backup_path="$DOTFILES_BACKUP_DIR/$rel"
+    mkdir -p "${backup_path:h}"
+    mv "$target" "$backup_path"
+    echo "backup $rel"
+}
+
+prepare_targets() {
+    local folder=$1
+    local source_root="$DOTFILES/$folder"
+    local source_path rel target
+
+    while IFS= read -r -d '' source_path; do
+        rel=${source_path#"$source_root"/}
+        target="$HOME/$rel"
+
+        if [[ (-e "$target" || -L "$target") && ! -d "$target" ]]; then
+            backup_target "$target"
+        fi
+
+        mkdir -p "$target"
+    done < <(find "$source_root" -mindepth 1 -type d -print0 | sort -z)
+
+    while IFS= read -r -d '' source_path; do
+        rel=${source_path#"$source_root"/}
+        target="$HOME/$rel"
+
+        if [[ -L "$target" && $(readlink "$target") == "$source_path" ]]; then
+            continue
+        fi
+
+        if [[ -e "$target" || -L "$target" ]]; then
+            backup_target "$target"
+        fi
+    done < <(find "$source_root" -mindepth 1 ! -type d -print0 | sort -z)
+}
+
+link_with_fallback() {
+    local folder=$1
+    local source_root="$DOTFILES/$folder"
+    local source_path rel target
+
+    while IFS= read -r -d '' source_path; do
+        rel=${source_path#"$source_root"/}
+        target="$HOME/$rel"
+
+        if [[ -e "$target" && ! -d "$target" ]]; then
+            echo "cannot create directory for $rel: target exists at $target" >&2
+            return 1
+        fi
+
+        mkdir -p "$target"
+    done < <(find "$source_root" -mindepth 1 -type d -print0 | sort -z)
+
+    while IFS= read -r -d '' source_path; do
+        rel=${source_path#"$source_root"/}
+        target="$HOME/$rel"
+
+        if [[ -L "$target" ]]; then
+            if [[ $(readlink "$target") == "$source_path" ]]; then
+                continue
+            fi
+
+            echo "cannot link $rel: target symlink points elsewhere at $target" >&2
+            return 1
+        fi
+
+        if [[ -e "$target" ]]; then
+            echo "cannot link $rel: target exists at $target" >&2
+            return 1
+        fi
+
+        mkdir -p "${target:h}"
+        ln -s "$source_path" "$target"
+        echo "link $rel"
+    done < <(find "$source_root" -mindepth 1 ! -type d -print0 | sort -z)
+}
+
 pushd "$DOTFILES" >/dev/null
-for folder in ${(s:,:)STOW_FOLDERS}; do
-    echo "stow $folder"
-    stow -D "$folder"
-    stow "$folder"
-done
+if command -v stow >/dev/null 2>&1; then
+    for folder in ${(s:,:)STOW_FOLDERS}; do
+        prepare_targets "$folder"
+        echo "stow $folder"
+        stow -D "$folder"
+        stow "$folder"
+    done
+else
+    echo "stow not found; using built-in symlink fallback" >&2
+    for folder in ${(s:,:)STOW_FOLDERS}; do
+        prepare_targets "$folder"
+        link_with_fallback "$folder"
+    done
+fi
 popd >/dev/null

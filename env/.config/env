@@ -10,3 +10,5 @@ addToPathFront() {
         export PATH=$1:$PATH
     fi
 }
+
+addToPathFront "$HOME/.local/.npm-global/bin"
