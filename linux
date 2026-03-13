@@ -3,8 +3,10 @@ if [[ -z $STOW_FOLDERS ]]; then
     STOW_FOLDERS="bin,bash,i3,tmux,zsh,xmodmap,env,alacritty"
 fi
 
+SCRIPT_DIR=${0:A:h}
+
 if [[ -z $DOTFILES ]]; then
-    DOTFILES=$HOME/.dotfiles
+    DOTFILES=$SCRIPT_DIR
 fi
 
 STOW_FOLDERS=$STOW_FOLDERS DOTFILES=$DOTFILES "$DOTFILES/install"
