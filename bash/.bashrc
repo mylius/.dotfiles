@@ -34,6 +34,10 @@ killport() {
   echo "Killed processes on port $1: $pids"
 }
 
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+
 case $- in
   *i*) bind -x '"\C-f":"tmux-sessionizer"' ;;
 esac
