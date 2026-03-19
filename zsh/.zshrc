@@ -67,7 +67,9 @@ unset __conda_setup CONDA_ROOT
 . "/Users/mylius/.deno/env"
 
 # Initialize zoxide
-eval "$(zoxide init zsh)"
+if command -v zoxide >/dev/null 2>&1; then
+    eval "$(zoxide init zsh)"
+fi
 
 alias lg='lazygit'
 
@@ -100,3 +102,12 @@ killport() {
 
 # Initialize starship (this must be at the end of the file)
 eval "$(starship init zsh)"
+
+# Infinite and timestamped zsh history configuration
+export HISTSIZE=1000000
+export SAVEHIST=1000000
+export HISTFILE=$HOME/.config/zsh/history
+setopt APPEND_HISTORY
+setopt INC_APPEND_HISTORY
+setopt HIST_IGNORE_ALL_DUPS
+setopt HIST_REDUCE_BLANKS

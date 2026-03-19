@@ -19,6 +19,10 @@ if command -v atuin >/dev/null 2>&1; then
   eval "$(atuin init bash)"
 fi
 
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init bash)"
+fi
+
 killport() {
   if [ -z "$1" ]; then
     echo "Usage: killport <port>"
