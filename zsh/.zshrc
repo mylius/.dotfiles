@@ -2,8 +2,11 @@
 export PATH="/usr/local/opt/libpq/bin:$PATH"
 export PATH="$PATH:/home/zufall/.zig/zig-linux-x86_64-0.14.0-dev.349+e82f7d380"
 export PATH="$HOME/.cargo/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 export PATH="/opt/local/bin:$PATH"
-export PATH=$PATH:$(go env GOPATH)/bin
+if command -v go >/dev/null 2>&1; then
+    export PATH="$PATH:$(go env GOPATH)/bin"
+fi
 
 for conda_root in "$HOME/miniforge3" "$HOME/miniconda3"; do
     if [ -d "$conda_root/bin" ]; then
@@ -64,7 +67,9 @@ fi
 unset __conda_setup CONDA_ROOT
 
 # Deno configuration
-. "/Users/mylius/.deno/env"
+if [ -f "$HOME/.deno/env" ]; then
+    . "$HOME/.deno/env"
+fi
 
 # Initialize zoxide
 if command -v zoxide >/dev/null 2>&1; then
@@ -101,7 +106,9 @@ killport() {
 }
 
 # Initialize starship (this must be at the end of the file)
-eval "$(starship init zsh)"
+if command -v starship >/dev/null 2>&1; then
+    eval "$(starship init zsh)"
+fi
 
 # Infinite and timestamped zsh history configuration
 export HISTSIZE=1000000
@@ -111,3 +118,5 @@ setopt APPEND_HISTORY
 setopt INC_APPEND_HISTORY
 setopt HIST_IGNORE_ALL_DUPS
 setopt HIST_REDUCE_BLANKS
+
+. "$HOME/.atuin/bin/env"
