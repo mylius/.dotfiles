@@ -1,0 +1,10 @@
+# Centralized worktrees under /workspace/wt/<repo>/<branch> (nvme, not nfs)
+worktree-path = "/workspace/wt/{{ repo }}/{{ branch | sanitize }}"
+
+# Post-start hook: create tmux session with standard windows
+[post-start]
+session = "topic-create-session '{{ worktree_path }}' '{{ branch | sanitize }}'"
+
+# Post-merge hook: kill tmux session after merge
+[post-merge]
+cleanup = "tmux kill-session -t '{{ branch | sanitize }}' 2>/dev/null || true"

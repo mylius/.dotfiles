@@ -1,0 +1,3 @@
+# Project-specific configs (use .example files as templates)
+topic/.config/topic/jump-dirs.conf
+topic/.config/topic/nvim-dir.conf

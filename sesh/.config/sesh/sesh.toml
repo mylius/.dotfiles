@@ -1,0 +1,30 @@
+#:schema https://github.com/joshmedeski/sesh/raw/main/sesh.schema.json
+
+# Keep zoxide for repo roots, sesh for worktree sessions
+sort_order = ["config", "tmux"]
+
+# Window definitions
+[[window]]
+name = "nvim"
+startup_script = "nvim"
+
+[[window]]
+name = "claude"
+startup_script = "claude"
+
+[[window]]
+name = "codex"
+startup_script = "codex"
+
+[[window]]
+name = "shell"
+# No startup script - plain shell
+
+[[window]]
+name = "jump"
+startup_script = "topic-jump"
+
+# Wildcard for all worktrees on nvme
+[[wildcard]]
+pattern = "/workspace/wt/**"
+startup_command = "topic-session-setup"

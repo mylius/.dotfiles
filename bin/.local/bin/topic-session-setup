@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# topic-session-setup - create standard windows for a topic session
+
+set -euo pipefail
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/topic"
+
+# Read nvim directory from config (relative to worktree root)
+NVIM_DIR=""
+if [[ -f "$CONFIG_DIR/nvim-dir.conf" ]]; then
+    NVIM_DIR=$(grep -v '^#' "$CONFIG_DIR/nvim-dir.conf" | grep -v '^$' | head -1)
+fi
+NVIM_DIR="${NVIM_DIR:-.}"
+
+# Get current session name
+SESSION=$(tmux display-message -p '#S')
+
+# Create windows (first window already exists)
+tmux rename-window -t "$SESSION:1" "nvim"
+
+tmux new-window -t "$SESSION" -n "claude"
+tmux new-window -t "$SESSION" -n "codex"
+tmux new-window -t "$SESSION" -n "shell"
+tmux new-window -t "$SESSION" -n "jump"
+
+# Start apps in each window
+tmux send-keys -t "$SESSION:nvim" "nvim $NVIM_DIR" Enter
+tmux send-keys -t "$SESSION:claude" "claude" Enter
+tmux send-keys -t "$SESSION:codex" "codex" Enter
+# shell stays blank
+tmux send-keys -t "$SESSION:jump" "topic-jump '$SESSION:jump'" Enter
+
+# Select the nvim window
+tmux select-window -t "$SESSION:nvim"

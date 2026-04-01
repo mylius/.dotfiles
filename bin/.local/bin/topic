@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# topic - unified worktree + tmux workspace command
+
+set -euo pipefail
+
+usage() {
+    cat <<EOF
+Usage: topic [OPTIONS] [branch]
+
+Switch to, create, or remove worktree-based tmux sessions.
+
+Options:
+  -c, --create    Create a new worktree and session
+  -r, --remove    Remove a worktree and its session (fuzzy finder if no branch)
+  -h, --help      Show this help message
+
+Examples:
+  topic                    Fuzzy-select topic to switch to
+  topic feature/auth       Switch to existing topic
+  topic -c feature/new     Create new topic
+  topic -r                 Fuzzy-select topic to remove
+  topic -r feature/old     Remove specific topic
+EOF
+    exit "${1:-1}"
+}
+
+# Parse flags
+ACTION="switch"
+BRANCH=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -c|--create)
+            ACTION="create"
+            shift
+            ;;
+        -r|--remove)
+            ACTION="remove"
+            shift
+            ;;
+        -h|--help)
+            usage 0
+            ;;
+        -*)
+            echo "Unknown option: $1"
+            usage
+            ;;
+        *)
+            BRANCH="$1"
+            shift
+            ;;
+    esac
+done
+
+# Handle remove action
+if [[ "$ACTION" == "remove" ]]; then
+    if [[ -z "$BRANCH" ]]; then
+        # Fast fuzzy finder using git worktree list (instant vs slow wt list)
+        BRANCH=$(git worktree list --porcelain 2>/dev/null | \
+            grep "^branch" | \
+            sed 's|branch refs/heads/||' | \
+            grep -v '^main$' | \
+            fzf --prompt="Remove topic: " --height=40% --reverse) || exit 0
+        [[ -z "$BRANCH" ]] && exit 0
+    fi
+
+    SESSION_NAME="${BRANCH//\//-}"
+
+    # Kill tmux session first (if exists)
+    tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
+
+    # Remove worktree
+    wt remove "$BRANCH"
+    exit 0
+fi
+
+# For switch without branch, use fuzzy finder
+if [[ -z "$BRANCH" && "$ACTION" == "switch" ]]; then
+    BRANCHES=$(git worktree list --porcelain 2>/dev/null | \
+        grep "^branch" | \
+        sed 's|branch refs/heads/||')
+
+    # --print-query outputs query on first line, selection on second
+    FZF_OUTPUT=$(echo "$BRANCHES" | \
+        fzf --prompt="Switch to topic: " --height=40% --reverse --print-query 2>/dev/null) || true
+
+    QUERY=$(echo "$FZF_OUTPUT" | head -1)
+    SELECTION=$(echo "$FZF_OUTPUT" | sed -n '2p')
+
+    # Use selection if it exists, otherwise check if query matches an existing branch
+    if [[ -n "$SELECTION" ]]; then
+        BRANCH="$SELECTION"
+    elif [[ -n "$QUERY" ]]; then
+        # Check if query matches an existing branch
+        if echo "$BRANCHES" | grep -qx "$QUERY"; then
+            BRANCH="$QUERY"
+        else
+            # Query doesn't match any branch - offer to create
+            read -p "Topic '$QUERY' not found. Create it? [y/N] " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                BRANCH="$QUERY"
+                ACTION="create"
+            else
+                exit 0
+            fi
+        fi
+    else
+        exit 0
+    fi
+fi
+
+# For create, branch is required
+[[ -z "$BRANCH" && "$ACTION" == "create" ]] && usage
+
+# For create action, prefix with username if not already prefixed
+if [[ "$ACTION" == "create" ]]; then
+    BRANCH_PREFIX="${TOPIC_BRANCH_PREFIX:-$USER}"
+    if [[ -n "$BRANCH_PREFIX" && "$BRANCH" != "$BRANCH_PREFIX/"* ]]; then
+        BRANCH="$BRANCH_PREFIX/$BRANCH"
+    fi
+fi
+
+# Sanitize branch name for session naming (same as worktrunk)
+SESSION_NAME="${BRANCH//\//-}"
+
+# Use worktrunk to switch/create worktree
+# The post-start hook will handle sesh session creation for new worktrees
+if [[ "$ACTION" == "create" ]]; then
+    # Try to create, fall back to switch if branch exists
+    if ! wt switch --create "$BRANCH" 2>/dev/null; then
+        echo "Branch exists, switching to it..."
+        wt switch "$BRANCH"
+    fi
+else
+    wt switch "$BRANCH"
+fi
+
+# If inside tmux, switch to the session
+if [[ -n "${TMUX:-}" ]]; then
+    tmux switch-client -t "$SESSION_NAME" 2>/dev/null || true
+fi

@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# topic-jump - create split panes for common directories
+
+set -euo pipefail
+
+ROOT="$(pwd)"
+CONFIG_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/topic/jump-dirs.conf"
+
+# Use explicit window target if provided, otherwise detect current window
+# This avoids race conditions when called via send-keys
+WINDOW_TARGET="${1:-$(tmux display-message -p '#{window_id}')}"
+
+# Read directories from config, or use defaults
+declare -a DIRS=()
+if [[ -f "$CONFIG_FILE" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        # Skip comments and empty lines
+        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+        # Trim whitespace
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        # Expand relative to ROOT
+        if [[ "$line" == "." ]]; then
+            dir="$ROOT"
+        else
+            dir="$ROOT/$line"
+        fi
+        [[ -d "$dir" ]] && DIRS+=("$dir")
+    done < "$CONFIG_FILE"
+else
+    # Fallback defaults if no config exists
+    for dir in "$ROOT" "$ROOT/wayve" "$ROOT/tests" "$ROOT/docs"; do
+        [[ -d "$dir" ]] && DIRS+=("$dir")
+    done
+fi
+
+NUM_DIRS=${#DIRS[@]}
+
+if [[ $NUM_DIRS -eq 0 ]]; then
+    echo "No directories found"
+    exit 0
+fi
+
+# First pane is current, create splits for the rest (target this window explicitly)
+for ((i = 1; i < NUM_DIRS; i++)); do
+    if ((i % 2 == 1)); then
+        tmux split-window -t "$WINDOW_TARGET" -h -c "${DIRS[$i]}"
+    else
+        tmux split-window -t "$WINDOW_TARGET" -v -c "${DIRS[$i]}"
+    fi
+done
+
+# Balance the layout
+tmux select-layout -t "$WINDOW_TARGET" tiled
+
+# Select first pane
+tmux select-pane -t "$WINDOW_TARGET.0"

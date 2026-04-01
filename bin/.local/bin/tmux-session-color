@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Hash session name to a catppuccin color and display styled session name
+
+SESSION_NAME="$(tmux display-message -p '#S')"
+
+# Catppuccin Mocha palette (subset for variety)
+COLORS=(
+  "#f38ba8"  # red
+  "#fab387"  # peach
+  "#f9e2af"  # yellow
+  "#a6e3a1"  # green
+  "#94e2d5"  # teal
+  "#89b4fa"  # blue
+  "#cba6f7"  # mauve
+  "#f5c2e7"  # pink
+)
+
+# Hash session name to color index
+HASH=$(echo -n "$SESSION_NAME" | cksum | cut -d' ' -f1)
+COLOR_IDX=$((HASH % ${#COLORS[@]}))
+COLOR="${COLORS[$COLOR_IDX]}"
+
+# Output with tmux color formatting
+echo "#[fg=$COLOR,bold]$SESSION_NAME#[default]"

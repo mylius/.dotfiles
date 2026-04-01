@@ -1,0 +1,4 @@
+# Directory to open in nvim (relative to worktree root)
+# Leave empty or use "." for repo root
+# Customize this for your project structure
+.

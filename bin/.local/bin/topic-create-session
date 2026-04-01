@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# topic-create-session - create tmux session with standard windows for a worktree
+
+set -euo pipefail
+
+WORKTREE_PATH="$1"
+SESSION_NAME="$2"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/topic"
+
+# Read nvim directory from config (relative to worktree root)
+NVIM_DIR=""
+if [[ -f "$CONFIG_DIR/nvim-dir.conf" ]]; then
+    NVIM_DIR=$(grep -v '^#' "$CONFIG_DIR/nvim-dir.conf" | grep -v '^$' | head -1)
+fi
+NVIM_DIR="${NVIM_DIR:-.}"
+
+# Check if session already exists
+if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+    if [[ -n "${TMUX:-}" ]]; then
+        tmux switch-client -t "$SESSION_NAME"
+    else
+        tmux attach-session -t "$SESSION_NAME"
+    fi
+    exit 0
+fi
+
+# Create new session with first window
+tmux new-session -d -s "$SESSION_NAME" -c "$WORKTREE_PATH"
+
+# Rename first window and create others (using index 1 since base-index is 1)
+tmux rename-window -t "$SESSION_NAME:1" "nvim"
+tmux new-window -t "$SESSION_NAME:2" -c "$WORKTREE_PATH" -n "claude"
+tmux new-window -t "$SESSION_NAME:3" -c "$WORKTREE_PATH" -n "codex"
+tmux new-window -t "$SESSION_NAME:4" -c "$WORKTREE_PATH" -n "shell"
+tmux new-window -t "$SESSION_NAME:5" -c "$WORKTREE_PATH" -n "jump"
+
+# Start apps using window indices
+tmux send-keys -t "$SESSION_NAME:1" "nvim $NVIM_DIR" Enter
+tmux send-keys -t "$SESSION_NAME:2" "claude" Enter
+tmux send-keys -t "$SESSION_NAME:3" "codex" Enter
+# window 4 (shell) stays blank
+tmux send-keys -t "$SESSION_NAME:5" "topic-jump '$SESSION_NAME:5'" Enter
+
+# Select nvim window
+tmux select-window -t "$SESSION_NAME:1"
+
+# Attach or switch
+if [[ -n "${TMUX:-}" ]]; then
+    tmux switch-client -t "$SESSION_NAME"
+else
+    tmux attach-session -t "$SESSION_NAME"
+fi

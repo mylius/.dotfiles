@@ -1,0 +1,7 @@
+# Directories to show in jump window (relative to worktree root)
+# Lines starting with # are comments, empty lines are ignored
+# Customize these paths for your project structure
+.
+src
+tests
+docs
