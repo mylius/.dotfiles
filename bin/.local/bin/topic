@@ -96,22 +96,18 @@ if [[ "$ACTION" == "purge" ]]; then
         exit 0
     fi
 
-    # Find branches that are merged or deleted on remote
+    # Find branches that are merged into main (safe to purge)
     TO_PURGE=()
     while IFS= read -r branch; do
         [[ -z "$branch" ]] && continue
 
-        # Check if remote branch exists
-        if ! git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
-            # Remote branch doesn't exist - check if it was ever pushed
-            if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
-                # Check if branch content is in main (merged via squash/rebase)
-                if git merge-base --is-ancestor "$branch" origin/main 2>/dev/null; then
-                    TO_PURGE+=("$branch (merged into main)")
-                else
-                    # Branch never pushed or remote deleted - mark for review
-                    TO_PURGE+=("$branch (remote branch gone)")
-                fi
+        # Only purge if branch content is fully in main (handles squash/rebase merges)
+        if git merge-base --is-ancestor "$branch" origin/main 2>/dev/null; then
+            # Check if remote branch still exists
+            if git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
+                TO_PURGE+=("$branch (merged, remote branch still exists)")
+            else
+                TO_PURGE+=("$branch (merged into main)")
             fi
         fi
     done <<< "$WORKTREE_BRANCHES"
