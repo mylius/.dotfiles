@@ -20,8 +20,8 @@ if [[ -f "$CONFIG_DIR/env-symlinks.conf" ]]; then
         # Skip comments and empty lines
         [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
 
-        # Parse: source -> target
-        if [[ "$line" =~ ^([^-]+)[[:space:]]*-\>[[:space:]]*(.+)$ ]]; then
+        # Parse: source -> target (arrow is " -> ")
+        if [[ "$line" =~ ^(.+)[[:space:]]+-\>[[:space:]]+(.+)$ ]]; then
             src="${BASH_REMATCH[1]}"
             dst="${BASH_REMATCH[2]}"
             # Trim whitespace
