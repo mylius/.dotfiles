@@ -12,6 +12,7 @@ Switch to, create, or remove worktree-based tmux sessions.
 Options:
   -c, --create    Create a new worktree and session
   -r, --remove    Remove a worktree and its session (fuzzy finder if no branch)
+  -p, --purge     Remove all worktrees whose branches are merged/deleted on remote
   -h, --help      Show this help message
 
 Examples:
@@ -20,6 +21,7 @@ Examples:
   topic -c feature/new     Create new topic
   topic -r                 Fuzzy-select topic to remove
   topic -r feature/old     Remove specific topic
+  topic -p                 Purge all merged/stale topics
 EOF
     exit "${1:-1}"
 }
@@ -36,6 +38,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -r|--remove)
             ACTION="remove"
+            shift
+            ;;
+        -p|--purge)
+            ACTION="purge"
             shift
             ;;
         -h|--help)
@@ -71,6 +77,73 @@ if [[ "$ACTION" == "remove" ]]; then
 
     # Remove worktree
     wt remove "$BRANCH"
+    exit 0
+fi
+
+# Handle purge action - remove worktrees for merged/deleted remote branches
+if [[ "$ACTION" == "purge" ]]; then
+    echo "Fetching remote state..."
+    git fetch --prune origin 2>/dev/null
+
+    # Get worktree branches (excluding main)
+    WORKTREE_BRANCHES=$(git worktree list --porcelain 2>/dev/null | \
+        grep "^branch" | \
+        sed 's|branch refs/heads/||' | \
+        grep -v '^main$') || true
+
+    if [[ -z "$WORKTREE_BRANCHES" ]]; then
+        echo "No topic worktrees found."
+        exit 0
+    fi
+
+    # Find branches that are merged or deleted on remote
+    TO_PURGE=()
+    while IFS= read -r branch; do
+        [[ -z "$branch" ]] && continue
+
+        # Check if remote branch exists
+        if ! git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
+            # Remote branch doesn't exist - check if it was ever pushed
+            if git show-ref --verify --quiet "refs/heads/$branch" 2>/dev/null; then
+                # Check if branch content is in main (merged via squash/rebase)
+                if git merge-base --is-ancestor "$branch" origin/main 2>/dev/null; then
+                    TO_PURGE+=("$branch (merged into main)")
+                else
+                    # Branch never pushed or remote deleted - mark for review
+                    TO_PURGE+=("$branch (remote branch gone)")
+                fi
+            fi
+        fi
+    done <<< "$WORKTREE_BRANCHES"
+
+    if [[ ${#TO_PURGE[@]} -eq 0 ]]; then
+        echo "No merged/stale topics found."
+        exit 0
+    fi
+
+    echo ""
+    echo "Topics to purge:"
+    for item in "${TO_PURGE[@]}"; do
+        echo "  - $item"
+    done
+    echo ""
+
+    read -p "Remove these topics? [y/N] " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 0
+    fi
+
+    for item in "${TO_PURGE[@]}"; do
+        branch="${item%% (*}"
+        SESSION_NAME="${branch//\//-}"
+
+        echo "Removing $branch..."
+        tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
+        wt remove "$branch" 2>/dev/null || echo "  (worktree already removed)"
+    done
+
+    echo "Done!"
     exit 0
 fi
 
