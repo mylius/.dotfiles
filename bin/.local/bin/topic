@@ -96,31 +96,47 @@ if [[ "$ACTION" == "purge" ]]; then
         exit 0
     fi
 
-    # Find branches that are merged into main (safe to purge)
+    # Find branches that were pushed and then deleted on remote (likely merged)
     TO_PURGE=()
+    WARNINGS=()
     while IFS= read -r branch; do
         [[ -z "$branch" ]] && continue
 
-        # Only purge if branch content is fully in main (handles squash/rebase merges)
-        if git merge-base --is-ancestor "$branch" origin/main 2>/dev/null; then
-            # Check if remote branch still exists
-            if git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null; then
-                TO_PURGE+=("$branch (merged, remote branch still exists)")
+        # Check if branch had tracking configured (was pushed at some point)
+        tracking=$(git config "branch.$branch.remote" 2>/dev/null || true)
+        remote_exists=false
+        git show-ref --verify --quiet "refs/remotes/origin/$branch" 2>/dev/null && remote_exists=true
+        commits_ahead=$(git rev-list origin/main.."$branch" --count 2>/dev/null || echo "0")
+
+        if [[ -n "$tracking" && "$remote_exists" == "false" ]]; then
+            # Was pushed, remote branch now gone
+            if [[ "$commits_ahead" -eq 0 ]]; then
+                TO_PURGE+=("$branch")
             else
-                TO_PURGE+=("$branch (merged into main)")
+                WARNINGS+=("$branch ($commits_ahead unpushed commits)")
             fi
         fi
     done <<< "$WORKTREE_BRANCHES"
 
+    # Show warnings first (not auto-purged)
+    if [[ ${#WARNINGS[@]} -gt 0 ]]; then
+        echo ""
+        echo "Skipped (have unpushed commits):"
+        for item in "${WARNINGS[@]}"; do
+            echo "  - $item"
+        done
+    fi
+
     if [[ ${#TO_PURGE[@]} -eq 0 ]]; then
-        echo "No merged/stale topics found."
+        echo ""
+        echo "No merged topics to purge."
         exit 0
     fi
 
     echo ""
-    echo "Topics to purge:"
-    for item in "${TO_PURGE[@]}"; do
-        echo "  - $item"
+    echo "Topics to purge (remote deleted, no local changes):"
+    for branch in "${TO_PURGE[@]}"; do
+        echo "  - $branch"
     done
     echo ""
 
@@ -130,8 +146,7 @@ if [[ "$ACTION" == "purge" ]]; then
         exit 0
     fi
 
-    for item in "${TO_PURGE[@]}"; do
-        branch="${item%% (*}"
+    for branch in "${TO_PURGE[@]}"; do
         SESSION_NAME="${branch//\//-}"
 
         echo "Removing $branch..."
