@@ -60,12 +60,12 @@ tmux new-window -t "$SESSION_NAME:3" -c "$WORKTREE_PATH" -n "codex"
 tmux new-window -t "$SESSION_NAME:4" -c "$WORKTREE_PATH" -n "shell"
 tmux new-window -t "$SESSION_NAME:5" -c "$WORKTREE_PATH" -n "jump"
 
-# Start apps using window indices
-tmux send-keys -t "$SESSION_NAME:1" "nvim $NVIM_DIR" Enter
-tmux send-keys -t "$SESSION_NAME:2" "claude" Enter
-tmux send-keys -t "$SESSION_NAME:3" "codex" Enter
+# Start apps using window indices (cd first to ensure correct working directory)
+tmux send-keys -t "$SESSION_NAME:1" "cd '$WORKTREE_PATH' && nvim $NVIM_DIR" Enter
+tmux send-keys -t "$SESSION_NAME:2" "cd '$WORKTREE_PATH' && claude" Enter
+tmux send-keys -t "$SESSION_NAME:3" "cd '$WORKTREE_PATH' && codex" Enter
 # window 4 (shell) stays blank
-tmux send-keys -t "$SESSION_NAME:5" "topic-jump '$SESSION_NAME:5'" Enter
+tmux send-keys -t "$SESSION_NAME:5" "cd '$WORKTREE_PATH' && topic-jump '$SESSION_NAME:5'" Enter
 
 # Select nvim window
 tmux select-window -t "$SESSION_NAME:1"
