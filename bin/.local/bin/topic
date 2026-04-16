@@ -16,6 +16,7 @@ clean_bazel_cache() {
             local size
             size=$(du -sh "$base" 2>/dev/null | cut -f1)
             echo "  Removing bazel cache ($size): $(basename "$base")"
+            chmod -R u+w "$base" 2>/dev/null || true
             rm -rf "$base"
         fi
     done
@@ -226,6 +227,7 @@ if [[ "$ACTION" == "purge" ]]; then
                 for entry in "${ORPHANED[@]}"; do
                     IFS='|' read -r path ws size <<< "$entry"
                     echo "  Removing $(basename "$ws") ($size)..."
+                    chmod -R u+w "$path" 2>/dev/null || true
                     rm -rf "$path"
                 done
             fi
