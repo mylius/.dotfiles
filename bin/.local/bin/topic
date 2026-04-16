@@ -277,10 +277,13 @@ fi
 # For create, branch is required
 [[ -z "$BRANCH" && "$ACTION" == "create" ]] && usage
 
-# For create action, prefix with username if not already prefixed
+# For create action, prefix with username unless branch already exists
 if [[ "$ACTION" == "create" ]]; then
     BRANCH_PREFIX="${TOPIC_BRANCH_PREFIX:-$USER}"
-    if [[ -n "$BRANCH_PREFIX" && "$BRANCH" != "$BRANCH_PREFIX/"* ]]; then
+    # Skip prefix if branch already exists locally or on remote
+    if [[ -n "$BRANCH_PREFIX" && "$BRANCH" != "$BRANCH_PREFIX/"* ]] \
+        && ! git show-ref --verify --quiet "refs/heads/$BRANCH" 2>/dev/null \
+        && ! git show-ref --verify --quiet "refs/remotes/origin/$BRANCH" 2>/dev/null; then
         BRANCH="$BRANCH_PREFIX/$BRANCH"
     fi
 fi
@@ -295,6 +298,11 @@ if [[ "$ACTION" == "create" ]]; then
     if ! wt switch --create "$BRANCH" 2>/dev/null; then
         echo "Branch exists, switching to it..."
         wt switch "$BRANCH"
+    fi
+
+    # Set up remote tracking if branch exists on remote
+    if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH" 2>/dev/null; then
+        git branch --set-upstream-to="origin/$BRANCH" "$BRANCH" 2>/dev/null || true
     fi
 else
     wt switch "$BRANCH"
