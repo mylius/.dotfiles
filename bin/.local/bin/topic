@@ -72,11 +72,32 @@ if [[ "$ACTION" == "remove" ]]; then
 
     SESSION_NAME="${BRANCH//\//-}"
 
+    # Check for uncommitted changes in worktree
+    WORKTREE_PATH=$(git worktree list --porcelain 2>/dev/null | \
+        awk -v branch="$BRANCH" '/^worktree /{wt=$0} /^branch refs\/heads\//{if($0 == "branch refs/heads/"branch) print wt}' | \
+        sed 's/^worktree //')
+
+    if [[ -n "$WORKTREE_PATH" ]]; then
+        DIRTY=$(git -C "$WORKTREE_PATH" status --porcelain 2>/dev/null)
+        if [[ -n "$DIRTY" ]]; then
+            echo "Warning: '$BRANCH' has uncommitted changes:"
+            git -C "$WORKTREE_PATH" status --short
+            echo ""
+            read -p "Delete anyway? [y/N] " -n 1 -r
+            echo
+            [[ ! $REPLY =~ ^[Yy]$ ]] && exit 0
+        fi
+    fi
+
     # Kill tmux session first (if exists)
     tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
 
-    # Remove worktree
-    wt remove "$BRANCH"
+    # Remove worktree (force if user confirmed dirty)
+    if [[ -n "$DIRTY" ]]; then
+        wt remove --force "$BRANCH"
+    else
+        wt remove "$BRANCH"
+    fi
     exit 0
 fi
 
