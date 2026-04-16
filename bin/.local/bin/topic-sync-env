@@ -1,54 +1,105 @@
 #!/usr/bin/env bash
-# topic-sync-env - propagate env symlinks to all existing worktrees
+# topic-sync-env - propagate env symlinks and hardlink dirs to all existing worktrees
 
 set -euo pipefail
 
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/topic"
-CONFIG_FILE="$CONFIG_DIR/env-symlinks.conf"
+CONFIG_FILE="$CONFIG_DIR/topic.toml"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
-    echo "No env-symlinks.conf found at $CONFIG_FILE"
+    echo "No topic.toml found at $CONFIG_FILE"
     exit 1
 fi
 
-echo "Syncing env symlinks to all worktrees..."
+# --- Parse topic.toml ---
+ENV_SRCS=()
+ENV_DSTS=()
+HARDLINK_DIRS=()
 
-# Get all worktree paths
+section=""
+_src=""
+while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%%#*}"
+    line="${line#"${line%%[![:space:]]*}"}"
+    line="${line%"${line##*[![:space:]]}"}"
+    [[ -z "$line" ]] && continue
+
+    if [[ "$line" == "[[env_symlinks]]" ]]; then
+        section="env_symlink"
+        _src="" ; _dst=""
+        continue
+    fi
+
+    if [[ "$line" =~ ^([a-z_]+)[[:space:]]*=[[:space:]]*\"(.+)\"$ ]]; then
+        key="${BASH_REMATCH[1]}"
+        val="${BASH_REMATCH[2]}"
+        case "$key" in
+            src) _src="$val" ;;
+            dst)
+                _dst="$val"
+                if [[ -n "$_src" ]]; then
+                    ENV_SRCS+=("$_src")
+                    ENV_DSTS+=("$_dst")
+                fi
+                ;;
+        esac
+    fi
+
+    if [[ "$line" =~ ^\"(.+)\",?$ ]]; then
+        HARDLINK_DIRS+=("${BASH_REMATCH[1]}")
+    fi
+done < "$CONFIG_FILE"
+
+# --- Sync to all worktrees ---
+MAIN_WORKTREE=$(git worktree list --porcelain 2>/dev/null | head -1 | sed 's/^worktree //')
+
+echo "Syncing to all worktrees..."
+
 git worktree list --porcelain | grep "^worktree " | sed 's/^worktree //' | while read -r worktree_path; do
     echo ""
     echo "==> $worktree_path"
 
-    while IFS= read -r line || [[ -n "$line" ]]; do
-        # Skip comments and empty lines
-        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
+    # Env symlinks
+    for i in "${!ENV_SRCS[@]}"; do
+        src="${ENV_SRCS[$i]}"
+        dst="${ENV_DSTS[$i]}"
+        src_path="$HOME/$src"
+        dst_path="$worktree_path/$dst"
 
-        # Parse: source -> target (arrow is " -> ")
-        if [[ "$line" =~ ^(.+)[[:space:]]+-\>[[:space:]]+(.+)$ ]]; then
-            src="${BASH_REMATCH[1]}"
-            dst="${BASH_REMATCH[2]}"
-            # Trim whitespace
-            src="${src%"${src##*[![:space:]]}"}"
-            dst="${dst#"${dst%%[![:space:]]*}"}"
+        if [[ ! -f "$src_path" ]]; then
+            echo "    [skip] $src (source not found)"
+        elif [[ -L "$dst_path" ]]; then
+            echo "    [ok] $dst (already symlinked)"
+        elif [[ -e "$dst_path" ]]; then
+            echo "    [skip] $dst (file exists, not a symlink)"
+        else
+            mkdir -p "$(dirname "$dst_path")"
+            ln -s "$src_path" "$dst_path"
+            echo "    [created] $dst -> $src"
+        fi
+    done
 
-            src_path="$HOME/$src"
-            dst_path="$worktree_path/$dst"
+    # Hardlink dirs
+    for dir in "${HARDLINK_DIRS[@]}"; do
+        src="$MAIN_WORKTREE/$dir"
+        dst="$worktree_path/$dir"
 
-            if [[ ! -f "$src_path" ]]; then
-                echo "    [skip] $src (source not found)"
-                continue
-            fi
-
-            if [[ -L "$dst_path" ]]; then
-                echo "    [ok] $dst (already symlinked)"
-            elif [[ -e "$dst_path" ]]; then
-                echo "    [skip] $dst (file exists, not a symlink)"
+        if [[ "$worktree_path" == "$MAIN_WORKTREE" ]]; then
+            continue
+        elif [[ ! -d "$src" ]]; then
+            echo "    [skip] $dir (not in main worktree)"
+        elif [[ -d "$dst" ]]; then
+            echo "    [ok] $dir (already exists)"
+        else
+            mkdir -p "$(dirname "$dst")"
+            if cp -al "$src" "$dst" 2>/dev/null; then
+                echo "    [hardlinked] $dir"
             else
-                mkdir -p "$(dirname "$dst_path")"
-                ln -s "$src_path" "$dst_path"
-                echo "    [created] $dst -> $src"
+                cp -r "$src" "$dst"
+                echo "    [copied] $dir (cross-device, no hardlink)"
             fi
         fi
-    done < "$CONFIG_FILE"
+    done
 done
 
 echo ""

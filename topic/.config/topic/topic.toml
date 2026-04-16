@@ -1,0 +1,25 @@
+# Topic configuration
+
+# Directory to open nvim in (relative to worktree root)
+nvim_dir = "wayve/ai/datasets/insight_tools"
+
+# Symlink env files from ~ into worktrees
+# Format: { src = "relative/to/home", dst = "relative/to/worktree" }
+[[env_symlinks]]
+src = ".env/hari-client.env"
+dst = "wayve/ai/datasets/insight_tools/hari/client/.env"
+
+[[env_symlinks]]
+src = ".env/hari-client.env"
+dst = "wayve/ai/datasets/insight_tools/hari/client/docs/example_code/.env"
+
+# Directories to hard-link copy from main worktree (instant, shares disk space)
+# Paths relative to worktree root
+hardlink_dirs = [
+    "wayve/ai/datasets/insight_tools/hari/fe/node_modules",
+]
+
+# Commands to run after creating a new worktree (cwd = worktree root)
+post_create_commands = [
+    "mkdir -p .husky/_ && make merge-base-hook",
+]

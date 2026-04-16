@@ -3,6 +3,24 @@
 
 set -euo pipefail
 
+# Clean up bazel output base for a worktree path
+clean_bazel_cache() {
+    local worktree_path="$1"
+    local cache_dir
+    cache_dir=$(dirname "$(bazel info output_base 2>/dev/null)" 2>/dev/null) || return
+    [[ ! -d "$cache_dir" ]] && return
+
+    for base in "$cache_dir"/*/; do
+        [[ ! -f "$base/DO_NOT_BUILD_HERE" ]] && continue
+        if grep -q "$worktree_path" "$base/DO_NOT_BUILD_HERE" 2>/dev/null; then
+            local size
+            size=$(du -sh "$base" 2>/dev/null | cut -f1)
+            echo "  Removing bazel cache ($size): $(basename "$base")"
+            rm -rf "$base"
+        fi
+    done
+}
+
 usage() {
     cat <<EOF
 Usage: topic [OPTIONS] [branch]
@@ -77,8 +95,9 @@ if [[ "$ACTION" == "remove" ]]; then
         awk -v branch="$BRANCH" '/^worktree /{wt=$0} /^branch refs\/heads\//{if($0 == "branch refs/heads/"branch) print wt}' | \
         sed 's/^worktree //')
 
+    DIRTY=""
     if [[ -n "$WORKTREE_PATH" ]]; then
-        DIRTY=$(git -C "$WORKTREE_PATH" status --porcelain 2>/dev/null)
+        DIRTY=$(git -C "$WORKTREE_PATH" status --porcelain 2>/dev/null || true)
         if [[ -n "$DIRTY" ]]; then
             echo "Warning: '$BRANCH' has uncommitted changes:"
             git -C "$WORKTREE_PATH" status --short
@@ -91,6 +110,9 @@ if [[ "$ACTION" == "remove" ]]; then
 
     # Kill tmux session first (if exists)
     tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
+
+    # Clean up bazel cache for this worktree
+    [[ -n "$WORKTREE_PATH" ]] && clean_bazel_cache "$WORKTREE_PATH"
 
     # Remove worktree (force if user confirmed dirty)
     if [[ -n "$DIRTY" ]]; then
@@ -148,32 +170,67 @@ if [[ "$ACTION" == "purge" ]]; then
         done
     fi
 
-    if [[ ${#TO_PURGE[@]} -eq 0 ]]; then
+    if [[ ${#TO_PURGE[@]} -gt 0 ]]; then
         echo ""
-        echo "No merged topics to purge."
-        exit 0
+        echo "Topics to purge (remote deleted, no local changes):"
+        for branch in "${TO_PURGE[@]}"; do
+            echo "  - $branch"
+        done
+        echo ""
+
+        read -p "Remove these topics? [y/N] " -n 1 -r
+        echo
     fi
 
-    echo ""
-    echo "Topics to purge (remote deleted, no local changes):"
-    for branch in "${TO_PURGE[@]}"; do
-        echo "  - $branch"
-    done
-    echo ""
+    if [[ ${#TO_PURGE[@]} -gt 0 && $REPLY =~ ^[Yy]$ ]]; then
+        for branch in "${TO_PURGE[@]}"; do
+            SESSION_NAME="${branch//\//-}"
 
-    read -p "Remove these topics? [y/N] " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 0
+            # Get worktree path before removing
+            WT_PATH=$(git worktree list --porcelain 2>/dev/null | \
+                awk -v branch="$branch" '/^worktree /{wt=$0} /^branch refs\/heads\//{if($0 == "branch refs/heads/"branch) print wt}' | \
+                sed 's/^worktree //')
+
+            echo "Removing $branch..."
+            tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
+            [[ -n "$WT_PATH" ]] && clean_bazel_cache "$WT_PATH"
+            wt remove "$branch" 2>/dev/null || echo "  (worktree already removed)"
+        done
     fi
 
-    for branch in "${TO_PURGE[@]}"; do
-        SESSION_NAME="${branch//\//-}"
+    # Clean orphaned bazel caches (worktrees already deleted)
+    cache_dir=$(dirname "$(bazel info output_base 2>/dev/null)" 2>/dev/null) || true
+    if [[ -n "$cache_dir" && -d "$cache_dir" ]]; then
+        ORPHANED=()
+        ORPHANED_SIZE=0
+        for base in "$cache_dir"/*/; do
+            [[ ! -f "$base/DO_NOT_BUILD_HERE" ]] && continue
+            ws_path=$(head -1 "$base/DO_NOT_BUILD_HERE" 2>/dev/null)
+            if [[ -n "$ws_path" && ! -d "$ws_path" ]]; then
+                size=$(du -sh "$base" 2>/dev/null | cut -f1)
+                ORPHANED+=("$base|$ws_path|$size")
+            fi
+        done
 
-        echo "Removing $branch..."
-        tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
-        wt remove "$branch" 2>/dev/null || echo "  (worktree already removed)"
-    done
+        if [[ ${#ORPHANED[@]} -gt 0 ]]; then
+            echo ""
+            echo "Orphaned bazel caches (worktree no longer exists):"
+            for entry in "${ORPHANED[@]}"; do
+                IFS='|' read -r path ws size <<< "$entry"
+                echo "  - $size  $(basename "$ws")"
+            done
+            echo ""
+            read -p "Remove orphaned caches? [y/N] " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                for entry in "${ORPHANED[@]}"; do
+                    IFS='|' read -r path ws size <<< "$entry"
+                    echo "  Removing $(basename "$ws") ($size)..."
+                    rm -rf "$path"
+                done
+            fi
+        fi
+    fi
 
     echo "Done!"
     exit 0
