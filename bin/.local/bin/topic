@@ -313,9 +313,23 @@ if [[ "$ACTION" == "create" ]]; then
         sed 's/^worktree //')
     [[ -n "$WT_PATH" ]] && echo "$WT_PATH"
 else
-    wt switch "$BRANCH"
-    # If inside tmux, switch to the session
-    if [[ -n "${TMUX:-}" ]]; then
-        tmux switch-client -t "$SESSION_NAME" 2>/dev/null || true
+    # Switch action: ensure worktree exists, then attach/switch to tmux session
+    # (creating the session on-demand if `topic -c` skipped it)
+    WT_PATH=$(git worktree list --porcelain 2>/dev/null | \
+        awk -v b="$BRANCH" '/^worktree /{p=$0} /^branch refs\/heads\//{if($0 == "branch refs/heads/"b) print p}' | \
+        sed 's/^worktree //')
+
+    if [[ -z "$WT_PATH" ]]; then
+        echo "No worktree for branch '$BRANCH'. Create it with: topic -c $BRANCH" >&2
+        exit 1
+    fi
+
+    if ! tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
+        # Create the session lazily (env symlinks etc. already ran during -c)
+        topic-create-session "$WT_PATH" "$SESSION_NAME"
+    elif [[ -n "${TMUX:-}" ]]; then
+        tmux switch-client -t "$SESSION_NAME"
+    else
+        tmux attach-session -t "$SESSION_NAME"
     fi
 fi
