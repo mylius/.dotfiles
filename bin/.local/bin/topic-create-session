@@ -8,6 +8,10 @@ SESSION_NAME="$2"
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/topic"
 CONFIG_FILE="$CONFIG_DIR/topic.toml"
 
+# Allow callers (e.g. `topic -c`) to skip tmux session creation while still
+# running env-symlink / hardlink / post_create_commands setup.
+: "${TOPIC_SKIP_SESSION:=0}"
+
 # --- Parse topic.toml ---
 NVIM_DIR="."
 ENV_SRCS=()
@@ -90,6 +94,11 @@ for dir in "${HARDLINK_DIRS[@]}"; do
         cp -al "$src" "$dst" 2>/dev/null || cp -r "$src" "$dst"
     fi
 done
+
+# Skip tmux session creation if requested (e.g. agent-only usage)
+if [[ "$TOPIC_SKIP_SESSION" == "1" ]]; then
+    exit 0
+fi
 
 # Check if session already exists
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then

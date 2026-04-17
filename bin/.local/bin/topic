@@ -292,8 +292,10 @@ fi
 SESSION_NAME="${BRANCH//\//-}"
 
 # Use worktrunk to switch/create worktree
-# The post-start hook will handle sesh session creation for new worktrees
+# The post-start hook will handle sesh session creation unless TOPIC_SKIP_SESSION=1
 if [[ "$ACTION" == "create" ]]; then
+    # Skip tmux session on create; user starts it by navigating with `topic <branch>`
+    export TOPIC_SKIP_SESSION=1
     # Try to create, fall back to switch if branch exists
     if ! wt switch --create "$BRANCH" 2>/dev/null; then
         echo "Branch exists, switching to it..."
@@ -304,11 +306,16 @@ if [[ "$ACTION" == "create" ]]; then
     if git show-ref --verify --quiet "refs/remotes/origin/$BRANCH" 2>/dev/null; then
         git branch --set-upstream-to="origin/$BRANCH" "$BRANCH" 2>/dev/null || true
     fi
+
+    # Print worktree path so callers (agents) can cd into it
+    WT_PATH=$(git worktree list --porcelain 2>/dev/null | \
+        awk -v b="$BRANCH" '/^worktree /{p=$0} /^branch refs\/heads\//{if($0 == "branch refs/heads/"b) print p}' | \
+        sed 's/^worktree //')
+    [[ -n "$WT_PATH" ]] && echo "$WT_PATH"
 else
     wt switch "$BRANCH"
-fi
-
-# If inside tmux, switch to the session
-if [[ -n "${TMUX:-}" ]]; then
-    tmux switch-client -t "$SESSION_NAME" 2>/dev/null || true
+    # If inside tmux, switch to the session
+    if [[ -n "${TMUX:-}" ]]; then
+        tmux switch-client -t "$SESSION_NAME" 2>/dev/null || true
+    fi
 fi
