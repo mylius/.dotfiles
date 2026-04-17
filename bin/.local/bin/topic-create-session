@@ -69,8 +69,24 @@ if [[ -f "$CONFIG_FILE" ]]; then
     done < "$CONFIG_FILE"
 fi
 
+# Determine whether this is a first-time setup (any work to do beyond session)
+NEEDS_SETUP=0
+for i in "${!ENV_SRCS[@]}"; do
+    [[ -f "$HOME/${ENV_SRCS[$i]}" && ! -e "$WORKTREE_PATH/${ENV_DSTS[$i]}" ]] && NEEDS_SETUP=1
+done
+MAIN_WORKTREE=$(git worktree list --porcelain 2>/dev/null | head -1 | sed 's/^worktree //')
+for dir in "${HARDLINK_DIRS[@]}"; do
+    [[ -d "$MAIN_WORKTREE/$dir" && ! -d "$WORKTREE_PATH/$dir" ]] && NEEDS_SETUP=1
+done
+[[ ${#POST_CREATE_CMDS[@]} -gt 0 && ! -f "$WORKTREE_PATH/.wayve/git_merge_base_hash" ]] && NEEDS_SETUP=1
+
+if [[ "$NEEDS_SETUP" == "1" ]]; then
+    echo "[topic] Setting up worktree at $WORKTREE_PATH"
+fi
+
 # --- Run post-create commands ---
 for cmd in "${POST_CREATE_CMDS[@]}"; do
+    echo "[topic] Running: $cmd"
     (cd "$WORKTREE_PATH" && eval "$cmd") || true
 done
 
@@ -79,17 +95,18 @@ for i in "${!ENV_SRCS[@]}"; do
     src_path="$HOME/${ENV_SRCS[$i]}"
     dst_path="$WORKTREE_PATH/${ENV_DSTS[$i]}"
     if [[ -f "$src_path" && ! -e "$dst_path" ]]; then
+        echo "[topic] Linking env: ${ENV_DSTS[$i]}"
         mkdir -p "$(dirname "$dst_path")"
         ln -s "$src_path" "$dst_path"
     fi
 done
 
 # --- Hard-link copy directories from main worktree ---
-MAIN_WORKTREE=$(git worktree list --porcelain 2>/dev/null | head -1 | sed 's/^worktree //')
 for dir in "${HARDLINK_DIRS[@]}"; do
     src="$MAIN_WORKTREE/$dir"
     dst="$WORKTREE_PATH/$dir"
     if [[ -d "$src" && ! -d "$dst" ]]; then
+        echo "[topic] Hard-link copying: $dir"
         mkdir -p "$(dirname "$dst")"
         cp -al "$src" "$dst" 2>/dev/null || cp -r "$src" "$dst"
     fi
@@ -109,6 +126,8 @@ if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
     fi
     exit 0
 fi
+
+echo "[topic] Creating tmux session: $SESSION_NAME"
 
 # Resolve nvim working directory
 NVIM_PATH="$WORKTREE_PATH/$NVIM_DIR"
