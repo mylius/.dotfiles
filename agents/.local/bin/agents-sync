@@ -1,0 +1,62 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}"
+LOG="$LOG_DIR/agents-sync.log"
+mkdir -p "$LOG_DIR"
+log() { print -r -- "$(date '+%F %T') $*" >>"$LOG"; }
+
+cd "$DOTFILES"
+if ! git fetch origin main --quiet; then
+  log "fetch failed"
+  exit 0
+fi
+behind=$(git rev-list --count main..origin/main)
+if (( behind > 0 )); then
+  if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
+    if git pull --ff-only origin main --quiet; then
+      log "pulled $behind commits"
+    else
+      log "pull failed, not fast-forward or conflict; skipping"
+      exit 0
+    fi
+  else
+    log "dirty tree, skipped pull ($behind behind)"
+  fi
+fi
+
+case "$(uname -s)" in
+  Darwin) host_file="host-mac.md" ;;
+  *)      host_file="host-linux.md" ;;
+esac
+ln -sfn "$DOTFILES/agents/$host_file" "$DOTFILES/agents/host.md"
+
+if [[ -n "${CODEX_HOME:-}" ]]; then
+  codex_home="$CODEX_HOME"
+elif [[ "$(uname -s)" == "Linux" && -d /workspace/.codex ]]; then
+  codex_home="/workspace/.codex"
+else
+  codex_home="$HOME/.codex"
+fi
+mkdir -p "$codex_home"
+{
+  cat "$DOTFILES/agents/common.md"
+  if [[ -f "$DOTFILES/agents/host.md" ]]; then
+    echo
+    cat "$DOTFILES/agents/host.md"
+  fi
+  if [[ -f "$DOTFILES/agents/wayve.md" ]]; then
+    echo
+    cat "$DOTFILES/agents/wayve.md"
+  fi
+} > "$codex_home/AGENTS.md"
+
+if [[ "$(uname -s)" == "Linux" && -d /workspace/.claude ]]; then
+  claude_dir="/workspace/.claude"
+else
+  claude_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+fi
+mkdir -p "$claude_dir"
+ln -sfn "$DOTFILES/agents/common.md" "$claude_dir/CLAUDE.md"
+log "synced codex=$codex_home claude=$claude_dir"

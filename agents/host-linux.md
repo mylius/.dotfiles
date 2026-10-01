@@ -1,0 +1,2 @@
+- `RIPGREP_CONFIG_PATH` may be inherited as `/workspace/.config/rg/.ripgreprc`, which is absent and causes a warning even though `rg` still runs.
+- When changing a product with a `CHANGELOG.md`, add the change to a new versioned entry; do not use an `## [Unreleased]` section.
