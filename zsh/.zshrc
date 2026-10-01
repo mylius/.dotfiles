@@ -2,7 +2,7 @@
 export PATH="/usr/local/opt/libpq/bin:$PATH"
 export PATH="$PATH:/home/zufall/.zig/zig-linux-x86_64-0.14.0-dev.349+e82f7d380"
 export PATH="$HOME/.cargo/bin:$PATH"
-export PATH="$HOME/.local/bin:$PATH"
+export PATH="/workspace/.local/bin:$HOME/.local/bin:$PATH"
 export PATH="/opt/local/bin:$PATH"
 export PATH="$HOME/go/bin:$PATH"  # Static GOPATH instead of $(go env GOPATH)
 
@@ -23,7 +23,9 @@ esac
 
 # Cache directory for shell init scripts
 ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
-mkdir -p "$ZSH_CACHE_DIR"
+ZSH_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/zsh"
+mkdir -p "$ZSH_CACHE_DIR" "$ZSH_STATE_DIR"
+export ZSH_COMPDUMP="$ZSH_CACHE_DIR/zcompdump-$HOST-$ZSH_VERSION"
 
 # Helper: cache and source init scripts (regenerate if binary is newer than cache)
 _cache_init() {
@@ -125,7 +127,30 @@ killport() {
 # History configuration
 export HISTSIZE=1000000
 export SAVEHIST=1000000
-export HISTFILE=$HOME/.config/zsh/history
+export HISTFILE="$ZSH_STATE_DIR/history"
 setopt APPEND_HISTORY INC_APPEND_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS
 
 if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi
+
+# bun completions
+[ -s "/home/jangabrielmylius/.bun/_bun" ] && source "/home/jangabrielmylius/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
+
+# Use workspace-backed Codex home; /home is slow on this setup.
+export CODEX_HOME=/workspace/.codex
+
+# Keep Pi's writable state on the local workspace disk, not the NFS home.
+export PI_CODING_AGENT_DIR=/workspace/.pi/agent
+export PI_CURSOR_SDK_STATE_ROOT=/workspace/.local/share/pi-cursor-sdk
+
+# herdr session switch supervisor
+herdr() {
+    "$HOME/.local/bin/herdr-switch" "$@"
+}
+
+# >>> Codex installer >>>
+export PATH="/home/jangabrielmylius/.local/bin:$PATH"
+# <<< Codex installer <<<

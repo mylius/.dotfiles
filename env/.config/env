@@ -1,4 +1,10 @@
 
+# Keep standards-compliant application state off the NFS home directory.
+export XDG_CONFIG_HOME=/workspace/.config
+export XDG_CACHE_HOME=/workspace/.cache
+export XDG_DATA_HOME=/workspace/.local/share
+export XDG_STATE_HOME=/workspace/.local/state
+
 addToPath() {
     if [[ "$PATH" != *"$1"* ]]; then
         export PATH=$PATH:$1
@@ -12,3 +18,7 @@ addToPathFront() {
 }
 
 addToPathFront "$HOME/.local/.npm-global/bin"
+addToPathFront "/workspace/.local/bin"
+
+# Keep Pi's writable state on the local workspace disk, not the NFS home.
+export PI_CODING_AGENT_DIR=/workspace/.pi/agent
