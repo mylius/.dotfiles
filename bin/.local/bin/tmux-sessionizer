@@ -1,28 +1,39 @@
 #!/usr/bin/env bash
-if [[ $# -eq 1 ]]; then
-    selected=$1
+parent_dirs=(
+  "$HOME/projects"
+  "$HOME/.dotfiles"
+  "$HOME/qm_repos"
+  "$HOME/wayve_repos"
+  "$HOME/.ssh"
+  "/workspace"
+)
+pick() {
+  local existing=() d
+  for d in "${parent_dirs[@]}"; do
+    [[ -d $d ]] && existing+=("$d")
+  done
+  (( ${#existing[@]} )) || return 1
+  {
+    printf '%s\n' "${existing[@]}"
+    find "${existing[@]}" -mindepth 1 -maxdepth 1 -type d
+  } | fzf
+}
+selected=""
+if [[ $# -eq 1 && -d $1 ]]; then
+  selected=$1
 else
-    # Create a list of parent directories with expanded home path
-    parent_dirs="${HOME}/projects ${HOME}/.dotfiles ${HOME}/qm-repos ${HOME}/.ssh"
-    
-    # Combine parent directories with their contents
-    selected=$(
-        (
-            echo "$parent_dirs" | tr ' ' '\n'
-            find ~/projects ~/.dotfiles ~/qm-repos ~/.ssh -mindepth 1 -maxdepth 1 -type d
-        ) | fzf
-    )
+  selected=$(pick) || exit 0
 fi
 if [[ -z $selected ]]; then
-    exit 0
+  exit 0
 fi
 selected_name=$(basename "$selected" | tr . _)
 tmux_running=$(pgrep tmux)
 if [[ -z $TMUX ]] && [[ -z $tmux_running ]]; then
-    tmux new-session -s $selected_name -c $selected
-    exit 0
+  tmux new-session -s $selected_name -c $selected
+  exit 0
 fi
-if ! tmux has-session -t=$selected_name 2> /dev/null; then
-    tmux new-session -ds $selected_name -c $selected
+if ! tmux has-session -t=$selected_name 2>/dev/null; then
+  tmux new-session -ds $selected_name -c $selected
 fi
 tmux switch-client -t $selected_name
