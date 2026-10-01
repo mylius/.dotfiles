@@ -1,0 +1,40 @@
+#!/usr/bin/env zsh
+set -euo pipefail
+
+typeset -a MAT_SKILLS
+MAT_SKILLS=(
+  grill-me
+  grill-with-docs
+  wait-what
+  wayfinder
+  teach
+  to-spec
+  to-tickets
+  domain-modeling
+  codebase-design
+  improve-codebase-architecture
+  writing-for-agents
+)
+
+command -v npx >/dev/null || { echo "npx missing" >&2; exit 1; }
+
+npx skills@latest add mattpocock/skills ${MAT_SKILLS[@]/#/--skill=} >/dev/null || {
+  echo "mattpocock/skills install failed" >&2
+  exit 1
+}
+
+npx skills@latest add backnotprop/pstack --skill=unslop >/dev/null
+
+npx impeccable install >/dev/null 2>&1 || echo "impeccable install skipped (needs manual run)" >&2
+
+mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills" "$HOME/.cursor/skills"
+
+for d in "$HOME/.agents/skills"/*(N/); do
+  name="${d:t}"
+  [[ "$name" = "synced" ]] && continue
+  [[ -e "$HOME/.claude/skills/$name" ]] || ln -s "../../.agents/skills/$name" "$HOME/.claude/skills/$name"
+  [[ -e "$HOME/.cursor/skills/$name" ]] || ln -s "../../.agents/skills/$name" "$HOME/.cursor/skills/$name"
+done
+
+echo "skills synced:"
+ls "$HOME/.agents/skills"
