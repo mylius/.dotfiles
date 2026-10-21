@@ -22,12 +22,13 @@ command -v npx >/dev/null || { echo "npx missing" >&2; exit 1; }
 # in the package into that repo's .agents/.claude/.codex instead.
 cd "$HOME"
 
-npx skills@latest add mattpocock/skills -g -y ${MAT_SKILLS[@]/#/--skill=} >/dev/null || {
+# --skill takes a space-separated list; `--skill=name` is ignored and installs every skill.
+npx skills@latest add mattpocock/skills -g -y --skill ${MAT_SKILLS[@]} >/dev/null || {
   echo "mattpocock/skills install failed" >&2
   exit 1
 }
 
-npx skills@latest add backnotprop/pstack -g -y --skill=unslop >/dev/null
+npx skills@latest add backnotprop/pstack -g -y --skill unslop >/dev/null
 
 npx impeccable install >/dev/null 2>&1 || echo "impeccable install skipped (needs manual run)" >&2
 
