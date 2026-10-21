@@ -26,11 +26,27 @@ def deny(reason):
     sys.exit(0)
 
 
+REDIRECT = re.compile(r"\d*(>>?|<<?<?|>&|<&)\S*|&>>?\S*")
+
+
+def strip_redirects(argv):
+    out, skip = [], False
+    for a in argv:
+        if skip:
+            skip = False
+        elif REDIRECT.fullmatch(a):
+            # A bare operator such as `>` takes the next word as its target.
+            skip = re.fullmatch(r"\d*(>>?|<<?<?|>&|<&)|&>>?", a) is not None
+        else:
+            out.append(a)
+    return out
+
+
 def segments(command):
     # Split on shell separators; good enough for agent one-liners.
     for part in re.split(r"&&|\|\||;|\||\n", command):
         try:
-            yield shlex.split(part)
+            yield strip_redirects(shlex.split(part))
         except ValueError:
             continue
 
