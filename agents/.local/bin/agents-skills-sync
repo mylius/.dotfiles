@@ -27,12 +27,19 @@ npx skills@latest add backnotprop/pstack --skill=unslop >/dev/null
 
 npx impeccable install >/dev/null 2>&1 || echo "impeccable install skipped (needs manual run)" >&2
 
-mkdir -p "$HOME/.agents/skills" "$HOME/.claude/skills" "$HOME/.cursor/skills"
+# Match agents-sync: Claude reads skills from its config dir, not always ~/.claude.
+if [[ "$(uname -s)" == "Linux" && -d /workspace/.claude ]]; then
+  claude_skills="/workspace/.claude/skills"
+else
+  claude_skills="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills"
+fi
+
+mkdir -p "$HOME/.agents/skills" "$claude_skills" "$HOME/.cursor/skills"
 
 for d in "$HOME/.agents/skills"/*(N/); do
   name="${d:t}"
   [[ "$name" = "synced" ]] && continue
-  [[ -e "$HOME/.claude/skills/$name" ]] || ln -s "../../.agents/skills/$name" "$HOME/.claude/skills/$name"
+  [[ -e "$claude_skills/$name" ]] || ln -s "$d" "$claude_skills/$name"
   [[ -e "$HOME/.cursor/skills/$name" ]] || ln -s "../../.agents/skills/$name" "$HOME/.cursor/skills/$name"
 done
 

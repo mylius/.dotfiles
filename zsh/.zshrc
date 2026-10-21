@@ -1,9 +1,9 @@
 # Basic environment setup
-export PATH="/usr/local/opt/libpq/bin:$PATH"
-export PATH="$PATH:/home/zufall/.zig/zig-linux-x86_64-0.14.0-dev.349+e82f7d380"
+if [[ "$OSTYPE" == darwin* ]]; then
+    export PATH="/usr/local/opt/libpq/bin:/opt/local/bin:$PATH"
+fi
 export PATH="$HOME/.cargo/bin:$PATH"
 export PATH="/workspace/.local/bin:$HOME/.local/bin:$PATH"
-export PATH="/opt/local/bin:$PATH"
 export PATH="$HOME/go/bin:$PATH"  # Static GOPATH instead of $(go env GOPATH)
 
 for conda_root in "$HOME/miniforge3" "$HOME/miniconda3"; do
@@ -15,11 +15,13 @@ for conda_root in "$HOME/miniforge3" "$HOME/miniconda3"; do
 done
 
 # pnpm configuration
-export PNPM_HOME="/Users/mylius/Library/pnpm"
-case ":$PATH:" in
-  *":$PNPM_HOME:"*) ;;
-  *) export PATH="$PNPM_HOME:$PATH" ;;
-esac
+if [[ "$OSTYPE" == darwin* ]]; then
+    export PNPM_HOME="$HOME/Library/pnpm"
+    case ":$PATH:" in
+      *":$PNPM_HOME:"*) ;;
+      *) export PATH="$PNPM_HOME:$PATH" ;;
+    esac
+fi
 
 # Cache directory for shell init scripts
 ZSH_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/zsh"
@@ -56,16 +58,19 @@ conda() {
     conda "$@"
 }
 
-# Lazy load NVM (only init when node/npm/nvm is first called)
+# Lazy load NVM. node/npm/npx come from PATH (~/.zshenv), so agent shell
+# snapshots never capture wrappers that depend on an uncaptured helper.
 export NVM_DIR="$HOME/.nvm"
-_load_nvm() {
-    unfunction node npm npx nvm 2>/dev/null
+if ! command -v node >/dev/null 2>&1; then
+    _nvm_bins=("$NVM_DIR"/versions/node/v*/bin(N/nOn))
+    (( $#_nvm_bins )) && export PATH="$_nvm_bins[1]:$PATH"
+    unset _nvm_bins
+fi
+nvm() {
+    unfunction nvm 2>/dev/null
     [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    nvm "$@"
 }
-node() { _load_nvm && node "$@"; }
-npm() { _load_nvm && npm "$@"; }
-npx() { _load_nvm && npx "$@"; }
-nvm() { _load_nvm && nvm "$@"; }
 
 # Deno configuration
 if [ -f "$HOME/.deno/env" ]; then
