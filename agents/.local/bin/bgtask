@@ -16,7 +16,9 @@ $CODEX_THREAD_ID. Codex sessions under T3 can't be woken this way.
 Codex's sandbox kills every process a command started once that command
 exits, so a sandboxed `run` only files the task. `bgtask daemon`, running
 outside the sandbox, picks it up and runs it under `codex sandbox` with
-workspace-write access to the task's cwd plus network. Only cwds under
+workspace-write access to the task's cwd plus network. Bazel can't run there
+(its output base is outside the writable roots), so `run` refuses Bazel
+commands from the sandbox; start those with escalated permissions. Only cwds under
 $BGTASK_ROOTS (colon-separated) are accepted.
 
 State lives in $BGTASK_HOME (default /tmp/bgtask-$UID), one directory per task.
@@ -267,6 +269,10 @@ def cmd_run(a):
     if a.match:
         re.compile(a.match)
     sandboxed = in_codex_sandbox()
+    if sandboxed and re.search(r"\bbazel(isk)?\b", " ".join(argv)):
+        sys.exit("bgtask: Bazel can't write its output base under /workspace/.cache from the Codex "
+                 "sandbox, so this task would fail with exit 36. Rerun the same `bgtask run` "
+                 "command with escalated permissions.")
     if sandboxed and not fresh(HOME / "daemon.heartbeat"):
         sys.exit("bgtask: the bgtask daemon is not running, and a task started inside the Codex "
                  "sandbox dies with the command that started it. Start the daemon outside the "
