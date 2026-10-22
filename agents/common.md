@@ -6,7 +6,7 @@ Apply the `unslop` skill to every user-facing response. Before replying, read an
 
 # Worktrees
 
-Before editing code or running builds, tests, or lint, create a dedicated clean Git worktree from `main` unless the user names another base. Do not work in the primary checkout or a dirty worktree. Name branches `jangabrielmylius/{product-name}/{meaningful_change_description_short}`.
+Before editing code or running builds, tests, or lint, create a dedicated clean Git worktree from `main` unless the user names another base. Do not work in the primary checkout or a dirty worktree. If you are already in a clean worktree on the branch the task is about, use it; to build or test that branch, don't make a new worktree from `main`. Name branches `jangabrielmylius/{product-name}/{meaningful_change_description_short}`.
 
 If work began in the wrong checkout, do not merely report it. Create the correct worktree, reapply or move only the task's changes there, restore the original checkout without disturbing pre-existing changes, and validate from the worktree.
 
