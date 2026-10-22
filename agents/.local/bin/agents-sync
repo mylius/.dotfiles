@@ -41,7 +41,8 @@ else
 fi
 mkdir -p "$codex_home"
 {
-  cat "$DOTFILES/agents/common.md"
+  # Codex doesn't resolve Claude's @file includes; their content is appended below.
+  grep -v '^@[A-Za-z0-9._-]*\.md$' "$DOTFILES/agents/common.md"
   if [[ -f "$DOTFILES/agents/host.md" ]]; then
     echo
     cat "$DOTFILES/agents/host.md"

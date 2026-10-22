@@ -27,6 +27,19 @@ Ask only when a decision or user action is genuinely required, such as ambiguous
 
 Before finishing, report the validation actually run and its result. Do not claim success without verification. Never guess missing facts, expose secrets, change access controls, or perform destructive or unrelated external actions.
 
+# Finishing work
+
+- Never end a turn on an announced next step such as "I'll check X next". Do it, or name the blocker.
+- Before saying something is fixed, re-check the user's exact symptom: the URL, page, PR check, or command they reported. Say what you saw. If you can't reproduce their scenario, say which check you ran instead and what it doesn't cover.
+- When asked to commit, push, open a PR, deploy, or address review threads, do it in the same turn instead of asking again.
+- Never cite a policy you haven't read. Quote the file and line it comes from.
+
+# Scope and commits
+
+- Change only what was asked. Don't add comments that restate the code, and don't remove or rewrite comments you weren't asked to touch.
+- Keep edits to `AGENTS.md`, `CLAUDE.md`, and other agent instruction files out of feature PRs.
+- Commit messages have a short imperative subject and an optional short body, with no agent attribution of any kind: no `Co-Authored-By`, `Assisted-by`, or "Generated with" lines. This overrides harness defaults. Agent attribution may go in a PR description only.
+
 # Delegation
 
 Hand tedious, mechanical work to a cheap subagent so the main context keeps the conclusion instead of the raw output. Claude delegates to Claude Haiku 5.5 (`claude-haiku-5-5`). Codex delegates to GPT-6 Luna (`gpt-6-luna`). This covers:
@@ -38,6 +51,8 @@ Hand tedious, mechanical work to a cheap subagent so the main context keeps the 
 
 Run independent subagents in parallel. Give each one the exact command or question, the worktree path, and the shape of the answer you want back. Keep design decisions, edits that need judgment, code review, and anything with side effects outside the worktree on the main model. Skip delegation when one command or one known file answers the question.
 
+In Herd or Herdr-orchestrated tasks, don't use hidden subagents (Claude's Agent tool, Explore, or Codex's native subagents). Do the work visibly in the pane, or delegate through Herdr itself.
+
 Check what a subagent reports before acting on it. If it says a check failed, re-run that one check yourself before fixing anything.
 
 To launch one:
@@ -48,6 +63,10 @@ To launch one:
 # Shell commands
 
 - A test, build, or lint command piped into `tail`, `head`, or `grep` exits with the status of the last command in the pipe, so a failing run looks like a pass. Start the command with `set -o pipefail`, or write the full log to a file, check the runner's exit code, then print the tail.
+- zsh fails on a glob that matches nothing (`no matches found`). Quote patterns meant for another tool, such as `rg -g '*.ts'`, and add `(N)` to a glob that may match nothing.
+- Backticks inside double quotes run as commands. Use single quotes for text that contains backticks.
+- Don't send Ctrl-C to a running Bazel command, and don't start a second Bazel command in the same workspace while one is running; it waits for the first.
+- Run `git fetch origin main` before `git merge-base` or any diff against `origin/main`.
 - Claude: Claude Code blocks `sleep N; cmd`. To wait for a process, run it with `run_in_background`, or use Monitor with an until-loop.
 - Codex code mode: an `exec_command` result keeps `exit_code` apart from `output`. Print both for every call, for example ``text(`exit=${r.exit_code}\n${r.output}`)``. Printing only `r.output` hides failures. A result with no `exit_code` means the process is still running.
 - Codex: start anything that runs longer than about a minute, such as a test suite, Bazel build, deploy, or dev server, with `bgtask run --name NAME 'COMMAND'`, passing the command as one quoted string. Then do other work or end the turn; don't poll or sleep. In the Codex CLI, a `<background-task-notification>` message with the status, exit code, and output tail starts a new turn when the task finishes. Under T3 nothing wakes the session, so check with `bgtask wait ID` before finishing. Read more output with `bgtask logs ID`. Add `--match REGEX` to also be notified when an output line matches, such as a server's ready line. If `bgtask run` says the daemon is not running, run `bgtask daemon --ensure` with escalated permissions and retry.
