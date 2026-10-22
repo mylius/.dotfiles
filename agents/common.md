@@ -50,6 +50,7 @@ To launch one:
 - A test, build, or lint command piped into `tail`, `head`, or `grep` exits with the status of the last command in the pipe, so a failing run looks like a pass. Start the command with `set -o pipefail`, or write the full log to a file, check the runner's exit code, then print the tail.
 - Claude: Claude Code blocks `sleep N; cmd`. To wait for a process, run it with `run_in_background`, or use Monitor with an until-loop.
 - Codex code mode: an `exec_command` result keeps `exit_code` apart from `output`. Print both for every call, for example ``text(`exit=${r.exit_code}\n${r.output}`)``. Printing only `r.output` hides failures. A result with no `exit_code` means the process is still running.
+- Codex: start anything that runs longer than about a minute, such as a test suite, Bazel build, deploy, or dev server, with `bgtask run --name NAME 'COMMAND'`, passing the command as one quoted string. Then do other work or end the turn; don't poll or sleep. In the Codex CLI, a `<background-task-notification>` message with the status, exit code, and output tail starts a new turn when the task finishes. Under T3 nothing wakes the session, so check with `bgtask wait ID` before finishing. Read more output with `bgtask logs ID`. Add `--match REGEX` to also be notified when an output line matches, such as a server's ready line. If `bgtask run` says the daemon is not running, run `bgtask daemon --ensure` with escalated permissions and retry.
 
 # Pull request reviews
 
