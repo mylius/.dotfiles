@@ -45,6 +45,12 @@ To launch one:
 - Claude: the Agent tool with `model: "haiku"`. In T3 Code, if that tool can't select Haiku, use `delegate_task` with provider `claudeAgent` and model `claude-haiku-5-5`.
 - Codex: the native subagent tool with `gpt-6-luna`. In T3 Code, if that tool can't select Luna, use `delegate_task` with provider `codex` and model `gpt-6-luna`.
 
+# Shell commands
+
+- A test, build, or lint command piped into `tail`, `head`, or `grep` exits with the status of the last command in the pipe, so a failing run looks like a pass. Start the command with `set -o pipefail`, or write the full log to a file, check the runner's exit code, then print the tail.
+- Claude: Claude Code blocks `sleep N; cmd`. To wait for a process, run it with `run_in_background`, or use Monitor with an until-loop.
+- Codex code mode: an `exec_command` result keeps `exit_code` apart from `output`. Print both for every call, for example ``text(`exit=${r.exit_code}\n${r.output}`)``. Printing only `r.output` hides failures. A result with no `exit_code` means the process is still running.
+
 # Pull request reviews
 
 - Resolve a GitHub review thread when you are confident its concern has been addressed and verified.

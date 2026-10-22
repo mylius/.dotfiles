@@ -4,6 +4,7 @@
 Reads the hook JSON on stdin and denies:
 - `git push` of a branch that is not main/master and not prefixed jangabrielmylius/.
 - `pkill -f PATTERN` where PATTERN would also match the agent's own shell.
+- `kill $(pgrep -f PATTERN)` and `pgrep -f PATTERN | xargs kill`, for the same reason.
 Anything it cannot parse is allowed.
 """
 import json
@@ -106,6 +107,29 @@ def check_pkill(argv):
              "or kill a saved PID.")
 
 
+PGREP = re.compile(r"\bpgrep\b([^;|&)`]*)")
+
+
+def check_pgrep_kill(command):
+    # pgrep skips itself but not the shell running this command, whose
+    # command line contains the pattern, so killing what it finds kills the shell.
+    if not re.search(r"(?<![\w-])kill\b", command):
+        return
+    for m in PGREP.finditer(command):
+        try:
+            args = shlex.split(m.group(1))
+        except ValueError:
+            continue
+        if "-f" not in args and "--full" not in args and not any(
+                re.fullmatch(r"-[a-zA-Z0-9]*f[a-zA-Z0-9]*", a) for a in args):
+            continue
+        patterns = [a for a in args if not a.startswith("-")]
+        if patterns and not any("[" in p for p in patterns):
+            deny("Killing the PIDs from pgrep -f also kills this shell, whose command line "
+                 "contains the pattern (exit 144). Bracket one character, e.g. "
+                 "pgrep -f '[v]ite dev', or kill a saved PID.")
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -117,6 +141,7 @@ def main():
     if not isinstance(command, str):
         return
     cwd = data.get("cwd") or os.getcwd()
+    check_pgrep_kill(command)
     for argv in segments(command):
         while argv and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", argv[0]):
             argv = argv[1:]  # leading VAR=value
