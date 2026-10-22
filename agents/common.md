@@ -27,6 +27,25 @@ Ask only when a decision or user action is genuinely required, such as ambiguous
 
 Before finishing, report the validation actually run and its result. Do not claim success without verification. Never guess missing facts, expose secrets, change access controls, or perform destructive or unrelated external actions.
 
+# Delegation
+
+Hand tedious, mechanical work to a subagent running Claude Haiku 5.5 (`claude-haiku-5-5`) or GPT-6 Luna (`gpt-6-luna`), so the main context keeps the conclusion instead of the raw output. This covers:
+
+- running tests, lint, type checks, and builds, then reporting each failure with file, line, and error text
+- searching a codebase for symbols, call sites, config keys, or naming patterns
+- reading logs, CI output, or long files to pull out specific facts
+- collecting data in bulk, such as listing worktrees, branches, or transcript statistics
+
+Run independent subagents in parallel. Give each one the exact command or question, the worktree path, and the shape of the answer you want back. Keep design decisions, edits that need judgment, code review, and anything with side effects outside the worktree on the main model. Skip delegation when one command or one known file answers the question.
+
+Check what a subagent reports before acting on it. If it says a check failed, re-run that one check yourself before fixing anything.
+
+To launch one:
+
+- Claude Code: the Agent tool with `model: "haiku"`.
+- Codex: the native subagent tool, if it can select `gpt-6-luna`.
+- T3 Code: `delegate_task` with provider `claudeAgent` and model `claude-haiku-5-5`, or provider `codex` and model `gpt-6-luna`. Use this when the native tool can't select the model.
+
 # Pull request reviews
 
 - Resolve a GitHub review thread when you are confident its concern has been addressed and verified.
