@@ -40,6 +40,12 @@ Before finishing, report the validation actually run and its result. Do not clai
 - Keep edits to `AGENTS.md`, `CLAUDE.md`, and other agent instruction files out of feature PRs.
 - Commit messages have a short imperative subject and an optional short body, with no agent attribution of any kind: no `Co-Authored-By`, `Assisted-by`, or "Generated with" lines. This overrides harness defaults. Agent attribution may go in a PR description only.
 
+# Testing
+
+- While iterating, run the narrowest check that covers the change: the specific test target, file, or `--test_filter`/`-k`. Run the package suite (`:py_checks`, `//pkg/...`) once before handing off. Don't run `//...` or several product trees unless asked.
+- Don't rerun an unchanged check to see its output again. Send the output to a log (`cmd > /tmp/NAME.log 2>&1; echo exit=$?`) and read the log.
+- After a failure, change something (code, flags, or environment) before running the same command again.
+
 # Delegation
 
 Hand tedious, mechanical work to a cheap subagent so the main context keeps the conclusion instead of the raw output. Claude delegates to Claude Haiku 5.5 (`claude-haiku-5-5`). Codex delegates to GPT-6 Luna (`gpt-6-luna`). This covers:
