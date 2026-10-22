@@ -35,7 +35,7 @@ import time
 from pathlib import Path
 
 HOME = Path(os.environ.get("BGTASK_HOME") or f"/tmp/bgtask-{os.getuid()}")
-ROOTS = os.environ.get("BGTASK_ROOTS", "/workspace/wt:/workspace/t3-worktrees:/workspace/WayveCode:/tmp")
+ROOTS = os.environ.get("BGTASK_ROOTS", "/workspace/wt:/workspace/t3-worktrees:/tmp")
 HEARTBEAT_STALE = 15  # seconds without a heartbeat before a process counts as gone
 TAIL_LINES = 20
 TAIL_CHARS = 3000

@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Measure how often Claude and Codex tool calls fail over a date window.
+
+Runs the analysis scripts in ~/.dotfiles/agents/audit over the local Claude
+transcripts and Codex rollouts, and writes claude/report_tables.md and
+codex/report.md under the output directory. The window defaults to the 30
+days ending yesterday (UTC). Reports quote redacted command output, so they
+stay outside the dotfiles repo.
+"""
+import argparse
+import datetime
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+AUDIT = Path(os.path.realpath(__file__)).parents[2] / "audit"
+STATE = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state") / "agents-audit"
+STEPS = ["claude_analyze.py", "claude_report.py", "codex_extract.py", "codex_analyze.py"]
+
+
+def main():
+    yesterday = datetime.datetime.now(datetime.timezone.utc).date() - datetime.timedelta(days=1)
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--end", default=yesterday.isoformat(), help="last UTC day, YYYY-MM-DD")
+    p.add_argument("--start", help="first UTC day; default 29 days before --end")
+    p.add_argument("--out", help=f"output directory; default {STATE}/START_END")
+    a = p.parse_args()
+    end = datetime.date.fromisoformat(a.end)
+    start = datetime.date.fromisoformat(a.start) if a.start else end - datetime.timedelta(days=29)
+    out = Path(a.out) if a.out else STATE / f"{start}_{end}"
+    for sub in ("claude", "codex/data"):
+        (out / sub).mkdir(parents=True, exist_ok=True)
+    env = dict(os.environ, AUDIT_START=str(start), AUDIT_END=str(end), AUDIT_OUT=str(out))
+    for step in STEPS:
+        r = subprocess.run([sys.executable, "-I", str(AUDIT / step)], env=env, cwd=out,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if r.returncode:
+            sys.exit(f"agents-audit: {step} failed (exit {r.returncode}):\n{r.stderr[-2000:]}")
+    print(out / "claude" / "report_tables.md")
+    print(out / "codex" / "report.md")
+
+
+if __name__ == "__main__":
+    main()
