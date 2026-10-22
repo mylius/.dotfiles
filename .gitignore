@@ -1,4 +1,5 @@
 # Project-specific configs (use .example files as templates)
 agents/wayve.md
+agents/wayve-local/
 agents/host.md
 .DS_Store

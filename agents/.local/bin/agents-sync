@@ -71,6 +71,10 @@ mkdir -p "$bin_dir"
 for tool in bgtask agents-audit; do
   ln -sfn "$DOTFILES/agents/.local/bin/$tool" "$bin_dir/$tool"
 done
+# Machine-local tools (gitignored), such as work-specific helpers.
+for tool in "$DOTFILES"/agents/wayve-local/bin/*(N); do
+  ln -sfn "$tool" "$bin_dir/${tool:t}"
+done
 if [[ "$(uname -s)" == "Linux" ]]; then
   python3 -I "$DOTFILES/agents/.local/bin/bgtask" daemon --ensure >/dev/null || log "bgtask daemon failed to start"
 fi
