@@ -11,7 +11,8 @@ every subscriber:
                  BGTASK_ID, BGTASK_STATUS, BGTASK_EXIT_CODE, BGTASK_OUTPUT set.
 
 Inside the Codex CLI, `run` subscribes the calling session through
-$CODEX_THREAD_ID. Codex sessions under T3 can't be woken this way.
+$CODEX_THREAD_ID. Codex sessions under T3 can't be woken this way; they hand
+`bgtask wait` to an async T3 child task, whose completion wakes them.
 
 Codex's sandbox kills every process a command started once that command
 exits, so a sandboxed `run` only files the task. `bgtask daemon`, running
@@ -304,8 +305,10 @@ def cmd_run(a):
     if targets:
         print("notify: " + ", ".join(targets))
     elif thread and under_t3:
-        print(f"notify: none; this Codex session runs under T3, which bgtask can't wake. "
-              f"Check with `bgtask wait {task_id}` or `bgtask status {task_id}`.")
+        print(f"notify: none; bgtask can't wake a Codex session under T3. To stay async, start an "
+              f"async delegate_task child (codex, gpt-6-luna) that runs `bgtask wait {task_id} "
+              f"--timeout 3600` until it exits, then continue or end the turn; T3 wakes you when "
+              f"the child finishes.")
     else:
         print(f"notify: none; check with `bgtask status {task_id}`")
 
