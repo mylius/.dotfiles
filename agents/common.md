@@ -29,7 +29,7 @@ Before finishing, report the validation actually run and its result. Do not clai
 
 # Delegation
 
-Hand tedious, mechanical work to a subagent running Claude Haiku 5.5 (`claude-haiku-5-5`) or GPT-6 Luna (`gpt-6-luna`), so the main context keeps the conclusion instead of the raw output. This covers:
+Hand tedious, mechanical work to a cheap subagent so the main context keeps the conclusion instead of the raw output. Claude delegates to Claude Haiku 5.5 (`claude-haiku-5-5`). Codex delegates to GPT-6 Luna (`gpt-6-luna`). This covers:
 
 - running tests, lint, type checks, and builds, then reporting each failure with file, line, and error text
 - searching a codebase for symbols, call sites, config keys, or naming patterns
@@ -42,9 +42,8 @@ Check what a subagent reports before acting on it. If it says a check failed, re
 
 To launch one:
 
-- Claude Code: the Agent tool with `model: "haiku"`.
-- Codex: the native subagent tool, if it can select `gpt-6-luna`.
-- T3 Code: `delegate_task` with provider `claudeAgent` and model `claude-haiku-5-5`, or provider `codex` and model `gpt-6-luna`. Use this when the native tool can't select the model.
+- Claude: the Agent tool with `model: "haiku"`. In T3 Code, if that tool can't select Haiku, use `delegate_task` with provider `claudeAgent` and model `claude-haiku-5-5`.
+- Codex: the native subagent tool with `gpt-6-luna`. In T3 Code, if that tool can't select Luna, use `delegate_task` with provider `codex` and model `gpt-6-luna`.
 
 # Pull request reviews
 
