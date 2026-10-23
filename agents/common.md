@@ -69,7 +69,7 @@ To launch one:
 # Shell commands
 
 - A test, build, or lint command piped into `tail`, `head`, or `grep` exits with the status of the last command in the pipe, so a failing run looks like a pass. Start the command with `set -o pipefail`, or write the full log to a file, check the runner's exit code, then print the tail.
-- zsh fails on a glob that matches nothing (`no matches found`). Quote patterns meant for another tool, such as `rg -g '*.ts'`, and add `(N)` to a glob that may match nothing.
+- zsh fails on a glob that matches nothing (`no matches found`). Quote patterns meant for another tool, such as `rg -g '*.ts'`. To list files that may not exist, use `find DIR -maxdepth 1 -name 'PATTERN'`; the `(N)` qualifier doesn't work in Claude's Bash tool, and `ls` with an empty glob lists the current directory. Quote words that start with `=`, such as `echo '====='`; zsh expands `=word` to a command path.
 - Backticks inside double quotes run as commands. Use single quotes for text that contains backticks.
 - Don't send Ctrl-C to a running Bazel command, and don't start a second Bazel command in the same workspace while one is running; it waits for the first.
 - Run `git fetch origin main` before `git merge-base` or any diff against `origin/main`.
