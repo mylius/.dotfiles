@@ -40,18 +40,28 @@ else
   codex_home="$HOME/.codex"
 fi
 mkdir -p "$codex_home"
-{
-  # Codex doesn't resolve Claude's @file includes; their content is appended below.
-  grep -v '^@[A-Za-z0-9._-]*\.md$' "$DOTFILES/agents/common.md"
-  if [[ -f "$DOTFILES/agents/host.md" ]]; then
-    echo
-    cat "$DOTFILES/agents/host.md"
-  fi
-  if [[ -f "$DOTFILES/agents/wayve.md" ]]; then
-    echo
-    cat "$DOTFILES/agents/wayve.md"
-  fi
-} > "$codex_home/AGENTS.md"
+# Each tool gets one file with the shared rules plus its own: bullets that start
+# with "- Codex" go only to Codex, and bullets that start with "- Claude" only to
+# Claude. The @file includes are inlined, since the file no longer sits next to them.
+render() {
+  local skip="$1"
+  grep -v -e '^@[A-Za-z0-9._-]*\.md$' -e "^- $skip" "$DOTFILES/agents/common.md"
+  local extra
+  for extra in host.md wayve.md; do
+    if [[ -f "$DOTFILES/agents/$extra" ]]; then
+      echo
+      grep -v "^- $skip" "$DOTFILES/agents/$extra"
+    fi
+  done
+}
+render Claude > "$codex_home/AGENTS.md"
+cp "$DOTFILES/agents/codex-hooks.json" "$codex_home/hooks.json.new"
+if ! cmp -s "$codex_home/hooks.json.new" "$codex_home/hooks.json"; then
+  mv "$codex_home/hooks.json.new" "$codex_home/hooks.json"
+  log "codex hooks.json changed; trust the new hooks with /hooks in Codex"
+else
+  rm "$codex_home/hooks.json.new"
+fi
 
 if [[ "$(uname -s)" == "Linux" && -d /workspace/.claude ]]; then
   claude_dir="/workspace/.claude"
@@ -59,7 +69,9 @@ else
   claude_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 fi
 mkdir -p "$claude_dir"
-ln -sfn "$DOTFILES/agents/common.md" "$claude_dir/CLAUDE.md"
+# mv replaces the old symlink to common.md instead of writing through it.
+render Codex > "$claude_dir/CLAUDE.md.new"
+mv "$claude_dir/CLAUDE.md.new" "$claude_dir/CLAUDE.md"
 
 # Agent tools on PATH.
 if [[ "$(uname -s)" == "Linux" && -d /workspace/.local/bin ]]; then

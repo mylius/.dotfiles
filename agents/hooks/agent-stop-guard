@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Stop hook for Claude Code and Codex.
+
+Blocks the end of a turn once when the final reply ends by announcing a next
+step ("I'll check X next.") instead of doing it. The agent gets the reason and
+continues; a second stop in the same turn always goes through
+(`stop_hook_active`). Replies that ask the user something, name a blocker, or
+wait for a background task notification are allowed.
+"""
+import json
+import os
+import re
+import sys
+import time
+
+STATE = os.path.join(
+    os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"),
+    "agent-hooks",
+)
+
+ANNOUNCE = re.compile(
+    r"(?:^|[.!:;\n]\s*|\b(?:next|now|then|first),?\s+)"
+    r"(?:I'll|I will|I'm going to|I am going to|I'm about to|let me|going to)\s+"
+    r"(?:now\s+|next\s+|also\s+|then\s+|first\s+)?"
+    r"(?!know\b|be\b|leave\b|keep\b|hold\b|wait\b|stop\b|assume\b|need\b|summari[sz]e\b)"
+    r"(\w+)",
+    re.IGNORECASE,
+)
+
+ALLOWED = re.compile(
+    r"\?"
+    r"|notif|background|tskr|\bwak(?:e|es|ing)\b|still running"
+    r"|\b(?:when|once|after|as soon as|until)\b|\bin (?:about |around )?[\w.]+ (?:seconds?|minutes?|hours?)\b"
+    r"|\bblock(?:ed|er|ing)\b|\bneeds? (?:you|your)\b|\byou(?:'ll| will)? need to\b"
+    r"|\bwaiting (?:on|for) (?:you|your)\b|\bif you(?:'d| would)? (?:like|want|prefer)\b"
+    r"|\bwhen you\b|\bafter you\b",
+    re.IGNORECASE,
+)
+
+
+def final_paragraph(text):
+    text = re.sub(r"```.*?```", " ", text, flags=re.S).strip()
+    paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    return paras[-1][-400:] if paras else ""
+
+
+def last_message_from_transcript(path):
+    """Last assistant text from a Claude Code transcript (JSONL)."""
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, os.SEEK_END)
+            f.seek(max(0, f.tell() - 400_000))
+            lines = f.read().decode("utf-8", "replace").splitlines()
+    except OSError:
+        return ""
+    for line in reversed(lines):
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        if d.get("type") != "assistant":
+            continue
+        parts = [c.get("text", "") for c in d.get("message", {}).get("content", [])
+                 if isinstance(c, dict) and c.get("type") == "text"]
+        if parts:
+            return "\n".join(parts)
+    return ""
+
+
+def check(message):
+    """Return the announced-step snippet if the stop should be blocked, else None."""
+    tail = final_paragraph(message)
+    if not tail or ALLOWED.search(tail):
+        return None
+    m = ANNOUNCE.search(tail)
+    if not m:
+        return None
+    return tail[m.start():].strip(" .:;\n")[:160]
+
+
+def log(event, data, snippet):
+    try:
+        os.makedirs(STATE, exist_ok=True)
+        with open(os.path.join(STATE, "stop-guard.jsonl"), "a") as f:
+            f.write(json.dumps({
+                "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "event": event,
+                "session": data.get("session_id"),
+                "cwd": data.get("cwd"),
+                "snippet": snippet,
+            }) + "\n")
+    except OSError:
+        pass
+
+
+def main():
+    try:
+        data = json.load(sys.stdin)
+    except ValueError:
+        return
+    if data.get("stop_hook_active"):
+        return
+    message = data.get("last_assistant_message")
+    if message is None and data.get("transcript_path"):
+        message = last_message_from_transcript(data["transcript_path"])
+    snippet = check(message or "")
+    if not snippet:
+        return
+    log("block", data, snippet)
+    print(json.dumps({
+        "decision": "block",
+        "reason": (
+            f'Your reply ends by announcing a next step ("{snippet}") instead of doing it. '
+            "Do that step now and report the result. If something blocks you, "
+            "say what it is instead. If the work is already done, end with the result."
+        ),
+    }))
+
+
+if __name__ == "__main__":
+    main()

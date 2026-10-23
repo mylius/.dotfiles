@@ -1,0 +1,193 @@
+#!/usr/bin/env python3
+"""PreToolUse hook for Codex shell commands: push waiting onto tskr notifications.
+
+Codex can't hook its own `write_stdin` polls, so this works on the shell side.
+It denies, with a reason, the first attempt at:
+- a long-running command started directly instead of through `tskr run`
+  (Bazel builds and tests, full Go, pytest, and JS test suites, plus any regex
+  listed in agents/wayve-local/slow-commands, one per line),
+- `tskr wait` in the Codex CLI, where the notification starts the next turn,
+- `sleep N` (N >= 5) and sleep-based polling loops.
+Running the identical command again within 10 minutes is allowed, so subagents
+and real fixed delays still work. Under T3 (CODEX_INTERNAL_ORIGINATOR_OVERRIDE),
+`tskr wait` is how a waiter child delivers the result, so it is always allowed.
+"""
+import hashlib
+import json
+import os
+import re
+import shlex
+import sys
+import time
+
+STATE = os.path.join(
+    os.environ.get("XDG_STATE_HOME") or os.path.expanduser("~/.local/state"),
+    "agent-hooks",
+)
+RETRY_WINDOW = 600
+
+
+def local_slow_patterns():
+    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "wayve-local", "slow-commands")
+    try:
+        with open(path) as f:
+            lines = [l.strip() for l in f]
+    except OSError:
+        return []
+    out = []
+    for line in lines:
+        if line and not line.startswith("#"):
+            try:
+                out.append(re.compile(line))
+            except re.error:
+                pass
+    return out
+
+
+LOCAL_SLOW = local_slow_patterns()
+
+SEGMENT_SPLIT = re.compile(r"&&|\|\||[;|\n]")
+ENV_ASSIGN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+WRAPPERS = {"env", "time", "nohup", "timeout", "command", "exec", "do", "then", "else", "{", "(", "!"}
+
+
+def words(segment):
+    try:
+        argv = shlex.split(segment)
+    except ValueError:
+        argv = segment.split()
+    while argv and (ENV_ASSIGN.match(argv[0]) or argv[0] in WRAPPERS
+                    or re.fullmatch(r"-\S+|\d+[smh]?", argv[0]) and argv[0] != "-"):
+        argv = argv[1:]
+    return argv
+
+
+def slow_reason(argv):
+    if not argv:
+        return None
+    prog = os.path.basename(argv[0])
+    rest = argv[1:]
+    if prog in ("bazel", "bazelisk"):
+        sub = next((a for a in rest if not a.startswith("-")), "")
+        if sub in ("build", "test", "run", "coverage"):
+            return f"bazel {sub}"
+    if prog == "go" and rest[:1] == ["test"] and any(a.endswith("...") for a in rest):
+        return "go test ./..."
+    if prog in ("python", "python3") and rest[:2] == ["-m", "pytest"]:
+        prog, rest = "pytest", rest[2:]
+    if prog == "pytest" and "-k" not in rest and not any("::" in a for a in rest):
+        if not any(not a.startswith("-") and a.endswith(".py") for a in rest):
+            return "the full pytest suite"
+    if prog in ("pnpm", "npm", "yarn"):
+        args = [a for a in rest if not a.startswith("-")]
+        if args[:1] == ["run"]:
+            args = args[1:]
+        if args and args[0] in ("test", "e2e", "test:e2e") and len(args) == 1:
+            return f"the full `{prog} {args[0]}` suite"
+    text = " ".join(argv)
+    for pattern in LOCAL_SLOW:
+        if pattern.search(text):
+            return "a command listed in slow-commands"
+    return None
+
+
+def classify(command):
+    segments = [s.strip() for s in SEGMENT_SPLIT.split(command) if s.strip()]
+    first = words(segments[0]) if segments else []
+    if first[:1] in (["tskr"], ["bgtask"]) and first[1:2] == ["run"]:
+        return None
+    for seg in segments:
+        argv = words(seg)
+        if argv[:1] in (["tskr"], ["bgtask"]) and argv[1:2] == ["wait"]:
+            if os.environ.get("CODEX_INTERNAL_ORIGINATOR_OVERRIDE") or "--help" in argv:
+                continue
+            return ("tskr-wait",
+                    "Don't wait on a tskr task in the Codex CLI. End the turn instead: the "
+                    "<background-task-notification> starts your next turn with the result. "
+                    "Run the same command again only if the user asked you to block on it.")
+        if argv[:1] == ["sleep"] and len(argv) > 1:
+            try:
+                seconds = float(argv[1].rstrip("smh")) * {"m": 60, "h": 3600}.get(argv[1][-1], 1)
+            except ValueError:
+                seconds = 0
+            if seconds >= 5:
+                return ("sleep",
+                        "Waiting is the notification's job. If the work you're waiting for runs "
+                        "under tskr, report what you have and end the turn; the notification starts "
+                        "your next turn. If it doesn't, restart it with `tskr run`. Run the same "
+                        "command again only if you need a fixed delay, such as a rate limit.")
+        reason = slow_reason(argv)
+        if reason:
+            quoted = shlex.quote(command)
+            return ("slow",
+                    f"This runs {reason}, which usually takes longer than 20 seconds. Start it with "
+                    f"`tskr run --name NAME {quoted}`, do any independent work, then end the turn; "
+                    "the notification starts your next turn. If you are a subagent, or there is "
+                    "nothing else to do and the user is waiting on this result in this turn, run "
+                    "the same command again and it will be allowed.")
+    return None
+
+
+def seen_recently(session, command):
+    os.makedirs(STATE, exist_ok=True)
+    path = os.path.join(STATE, "codex-wait-guard.json")
+    key = hashlib.sha256(f"{session}\0{command}".encode()).hexdigest()[:16]
+    now = time.time()
+    try:
+        with open(path) as f:
+            seen = json.load(f)
+    except (OSError, ValueError):
+        seen = {}
+    seen = {k: t for k, t in seen.items() if now - t < RETRY_WINDOW}
+    hit = key in seen
+    if hit:
+        del seen[key]
+    else:
+        seen[key] = now
+    tmp = f"{path}.{os.getpid()}"
+    with open(tmp, "w") as f:
+        json.dump(seen, f)
+    os.replace(tmp, path)
+    return hit
+
+
+def log(data, kind, decision):
+    try:
+        with open(os.path.join(STATE, "codex-wait-guard.jsonl"), "a") as f:
+            f.write(json.dumps({
+                "time": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "session": data.get("session_id"),
+                "model": data.get("model"),
+                "kind": kind,
+                "decision": decision,
+                "command": data["tool_input"]["command"][:200],
+            }) + "\n")
+    except OSError:
+        pass
+
+
+def main():
+    try:
+        data = json.load(sys.stdin)
+        command = data["tool_input"]["command"]
+    except (ValueError, KeyError, TypeError):
+        return
+    if not isinstance(command, str):
+        return
+    found = classify(command)
+    if not found:
+        return
+    kind, reason = found
+    if seen_recently(data.get("session_id"), command):
+        log(data, kind, "allow-retry")
+        return
+    log(data, kind, "deny")
+    print(json.dumps({"hookSpecificOutput": {
+        "hookEventName": "PreToolUse",
+        "permissionDecision": "deny",
+        "permissionDecisionReason": reason,
+    }}))
+
+
+if __name__ == "__main__":
+    main()
