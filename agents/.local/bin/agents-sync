@@ -61,21 +61,30 @@ fi
 mkdir -p "$claude_dir"
 ln -sfn "$DOTFILES/agents/common.md" "$claude_dir/CLAUDE.md"
 
-# Agent tools on PATH; on Linux the bgtask daemon runs Codex-sandboxed tasks.
+# Agent tools on PATH.
 if [[ "$(uname -s)" == "Linux" && -d /workspace/.local/bin ]]; then
   bin_dir="/workspace/.local/bin"
 else
   bin_dir="$HOME/.local/bin"
 fi
 mkdir -p "$bin_dir"
-for tool in bgtask agents-audit; do
+for tool in agents-audit; do
   ln -sfn "$DOTFILES/agents/.local/bin/$tool" "$bin_dir/$tool"
 done
 # Machine-local tools (gitignored), such as work-specific helpers.
 for tool in "$DOTFILES"/agents/wayve-local/bin/*(N); do
   ln -sfn "$tool" "$bin_dir/${tool:t}"
 done
-if [[ "$(uname -s)" == "Linux" ]]; then
-  python3 -I "$DOTFILES/agents/.local/bin/bgtask" daemon --ensure >/dev/null || log "bgtask daemon failed to start"
+# Machine-local setup scripts (gitignored), such as installing work tools; each
+# gets the bin directory as its argument.
+for script in "$DOTFILES"/agents/wayve-local/sync.d/*(N); do
+  [[ -x "$script" ]] && { "$script" "$bin_dir" || log "${script:t} failed"; }
+done
+if command -v tskr >/dev/null; then
+  # Threads started before the rename still call bgtask.
+  ln -sfn "$(command -v tskr)" "$bin_dir/bgtask"
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    tskr daemon --ensure >/dev/null || log "tskr daemon failed to start"
+  fi
 fi
 log "synced codex=$codex_home claude=$claude_dir"
