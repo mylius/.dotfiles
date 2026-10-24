@@ -1,9 +1,21 @@
+# Slate blue, frosted windows inspired by the reference screenshot.
 theme = OneDark
+background = #343f52
+foreground = #ffffff
+background-opacity = 0.72
+background-blur = 35
+
 macos-titlebar-proxy-icon = hidden
-shell-integration = none
 macos-titlebar-style = hidden
 title = " "
-background-opacity=0.85
-background-blur=true
-window-padding-x=4
+window-padding-x = 6
+window-padding-y = 6
+
+cursor-style = block_hollow
+cursor-color = #c0c9d8
+selection-background = #52657b
+selection-foreground = #ffffff
+unfocused-split-opacity = 0.9
+
+shell-integration = none
 # custom-shader = ghostty-shaders/in-game-crt.glsl
