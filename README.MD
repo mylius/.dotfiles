@@ -61,3 +61,41 @@ skills/               work-only skills
 ```
 
 `dotfiles-sync` pulls it alongside this repo.
+
+## Moving a machine from the old layout
+
+For a box that was set up before `setup` existed (the work Linux VPN box in
+particular). Nothing here moves data out of `/workspace`; it only changes
+which files are linked and rendered.
+
+1. Clone the work repo and carry the old gitignored files over:
+
+   ```sh
+   git clone git@github.com:mylius/dotfiles-work.git ~/.dotfiles-work
+   cd ~/.dotfiles
+   cp agents/wayve.md ~/.dotfiles-work/agents/work.md
+   cp agents/wayve-local/slow-commands ~/.dotfiles-work/agents/ 2>/dev/null
+   cp -a agents/wayve-local/bin/. ~/.dotfiles-work/agents/bin/ 2>/dev/null
+   cp -a agents/wayve-local/sync.d/. ~/.dotfiles-work/agents/sync.d/ 2>/dev/null
+   git -C ~/.dotfiles-work add -A && git -C ~/.dotfiles-work commit -m "Import work rules" && git -C ~/.dotfiles-work push
+   ```
+
+   Skip the clone and the copies on a private machine; its machine-only rules
+   go in `agents/local.md`, `local-claude.md`, and `local-codex.md` instead.
+
+2. Run `./setup --profile work` (or `private`). It writes the profile, links
+   the packages, renders the agent files, and installs the hourly timer.
+   Conflicting files are moved to `~/.dotfiles-backups/<timestamp>`.
+
+3. Remove what the old setup left behind:
+   - the cron or timer entry that called `agents-sync` directly
+     (`crontab -e`); `dotfiles-sync` now pulls and runs it,
+   - `agents/wayve.md` and `agents/wayve-local/` in `~/.dotfiles`, once
+     `~/.dotfiles-work` has them,
+   - stray links in `$HOME` from the old `agents` stow package:
+     `~/common.md`, `~/audit`, `~/hooks`, `~/codex-hooks.json`,
+     `~/host-linux.md`, `~/host-mac.md`, `~/private.md`.
+
+4. Check: `zsh -lic 'echo $DOTFILES_PROFILE $WORKSPACE_ROOT $CODEX_HOME'`
+   should print `work /workspace /workspace/.codex` on the work VPN box, and
+   `systemctl --user list-timers | grep dotfiles` should show the timer.
