@@ -80,7 +80,3 @@ To launch one:
 # Pull request reviews
 
 - Resolve a GitHub review thread when you are confident its concern has been addressed and verified.
-
-@host.md
-
-@wayve.md

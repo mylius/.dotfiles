@@ -33,13 +33,26 @@ npx skills@latest add backnotprop/pstack -g -y --skill unslop >/dev/null
 npx impeccable install >/dev/null 2>&1 || echo "impeccable install skipped (needs manual run)" >&2
 
 # Match agents-sync: Claude reads skills from its config dir, not always ~/.claude.
-if [[ "$(uname -s)" == "Linux" && -d /workspace/.claude ]]; then
-  claude_skills="/workspace/.claude/skills"
-else
-  claude_skills="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills"
-fi
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+source "$DOTFILES/env/.config/env"
+claude_skills="${CLAUDE_CONFIG_DIR:-$WORKSPACE_ROOT/.claude}/skills"
 
 mkdir -p "$HOME/.agents/skills" "$claude_skills" "$HOME/.cursor/skills"
+
+# Skills kept in the dotfiles: $DOTFILES/skills on every machine,
+# $DOTFILES/skills-private on private machines, $DOTFILES_WORK/skills on work ones.
+typeset -a skill_dirs
+skill_dirs=("$DOTFILES/skills")
+if [[ $DOTFILES_PROFILE == work ]]; then
+  skill_dirs+=("$DOTFILES_WORK/skills")
+else
+  skill_dirs+=("$DOTFILES/skills-private")
+fi
+for dir in "${skill_dirs[@]}"; do
+  for d in "$dir"/*(N/); do
+    ln -sfn "$d" "$HOME/.agents/skills/${d:t}"
+  done
+done
 
 for d in "$HOME/.agents/skills"/*(N/); do
   name="${d:t}"

@@ -1,0 +1,55 @@
+#!/usr/bin/env zsh
+# Install the dotfiles for this machine: pick stow packages by OS and profile,
+# link them, render agent instruction files, and install the sync timer.
+#
+#   ./setup --profile work|private   first run on a machine (writes the profile)
+#   ./setup                          later runs, also what dotfiles-sync calls
+#   ./setup --no-timer               skip installing the launchd/systemd timer
+set -euo pipefail
+
+DOTFILES=${0:A:h}
+export DOTFILES
+install_timer=1
+
+while (( $# )); do
+    case $1 in
+        --profile)
+            [[ $2 == work || $2 == private ]] || { echo "profile must be work or private" >&2; exit 2; }
+            mkdir -p "$HOME/.config/dotfiles"
+            print -r -- "$2" > "$HOME/.config/dotfiles/profile"
+            shift 2 ;;
+        --no-timer) install_timer=0; shift ;;
+        *) echo "unknown option $1" >&2; exit 2 ;;
+    esac
+done
+
+if [[ ! -r "$HOME/.config/dotfiles/profile" ]]; then
+    echo "no profile yet: run ./setup --profile work|private" >&2
+    exit 2
+fi
+source "$DOTFILES/env/.config/env"
+os=$(uname -s)
+echo "profile=$DOTFILES_PROFILE os=$os workspace=$WORKSPACE_ROOT"
+
+typeset -a packages
+packages=(bin bash zsh env tmux cursor alacritty ghostty starship yazi sesh worktrunk)
+case $os in
+    Darwin) packages+=(karabiner) ;;
+    *)      packages+=(i3 xmodmap systemd) ;;
+esac
+if [[ $DOTFILES_PROFILE == work && $os != Darwin ]]; then
+    packages+=(env-work)
+fi
+
+STOW_FOLDERS=${(j:,:)packages} DOTFILES=$DOTFILES "$DOTFILES/install"
+
+# Work material lives in a separate private repo; clone it once by hand.
+if [[ $DOTFILES_PROFILE == work && ! -d $DOTFILES_WORK ]]; then
+    echo "profile is work but $DOTFILES_WORK is missing; clone the private dotfiles-work repo there" >&2
+fi
+
+"$DOTFILES/agents/.local/bin/agents-sync"
+
+if (( install_timer )); then
+    "$DOTFILES/bin/.local/bin/dotfiles-sync" --install-timer
+fi

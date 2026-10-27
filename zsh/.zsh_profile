@@ -1,9 +1,6 @@
 VIM="nvim"
 
-source $HOME/.config/env
-
-addToPathFront $HOME/.local/bin
+source "$HOME/.config/env"
 
 # Where should I put you?
 bindkey -s ^f "tmux-sessionizer\n"
-export PATH="$HOME/.cargo/bin:$PATH"

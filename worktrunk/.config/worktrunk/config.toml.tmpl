@@ -1,0 +1,6 @@
+# Centralized worktrees under @WORKSPACE_ROOT@/wt/<repo>/<branch> (local disk)
+worktree-path = "@WORKSPACE_ROOT@/wt/{{ repo }}/{{ branch | sanitize }}"
+
+# Post-merge hook: kill tmux session after merge
+[post-merge]
+cleanup = "tmux kill-session -t '{{ branch | sanitize }}' 2>/dev/null || true"

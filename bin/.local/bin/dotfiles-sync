@@ -1,0 +1,80 @@
+#!/usr/bin/env zsh
+# Pull the dotfiles (and the private work repo when present), then re-run
+# ./setup so links, rendered templates, and agent files match the repo.
+# Runs hourly from launchd (macOS) or a systemd user timer (Linux).
+#
+#   dotfiles-sync                  pull and install
+#   dotfiles-sync --install-timer  (re)install the hourly timer for this user
+set -uo pipefail
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+source "$DOTFILES/env/.config/env"
+LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}"
+LOG="$LOG_DIR/dotfiles-sync.log"
+mkdir -p "$LOG_DIR"
+log() { print -r -- "$(date '+%F %T') $*" >>"$LOG"; }
+
+pull_repo() {
+    local repo=$1 name=${1:t}
+    [[ -d $repo/.git ]] || return 0
+    cd "$repo"
+    local branch
+    branch=$(git rev-parse --abbrev-ref HEAD)
+    if [[ $branch != main ]]; then
+        log "$name: on branch $branch, not pulling"
+        return 0
+    fi
+    if ! git fetch origin main --quiet 2>>"$LOG"; then
+        log "$name: fetch failed"
+        return 0
+    fi
+    local behind
+    behind=$(git rev-list --count main..origin/main)
+    (( behind > 0 )) || return 0
+    if [[ -n $(git status --porcelain --untracked-files=no) ]]; then
+        log "$name: dirty tree, skipped pull ($behind behind)"
+        return 0
+    fi
+    if git pull --ff-only origin main --quiet 2>>"$LOG"; then
+        log "$name: pulled $behind commits"
+    else
+        log "$name: pull failed, not fast-forward"
+    fi
+}
+
+install_timer() {
+    case "$(uname -s)" in
+        Darwin)
+            local plist="$HOME/Library/LaunchAgents/com.mylius.dotfiles-sync.plist"
+            mkdir -p "${plist:h}"
+            sed -e "s|@HOME@|$HOME|g" "$DOTFILES/launchd/com.mylius.dotfiles-sync.plist.tmpl" > "$plist"
+            launchctl bootout "gui/$UID/com.mylius.dotfiles-sync" 2>/dev/null || true
+            launchctl bootstrap "gui/$UID" "$plist"
+            echo "launchd: com.mylius.dotfiles-sync loaded (hourly)" ;;
+        *)
+            if command -v systemctl >/dev/null && systemctl --user show-environment >/dev/null 2>&1; then
+                systemctl --user daemon-reload
+                systemctl --user enable --now dotfiles-sync.timer
+                echo "systemd: dotfiles-sync.timer enabled (hourly)"
+            else
+                local line="17 * * * * $HOME/.local/bin/dotfiles-sync"
+                { crontab -l 2>/dev/null | grep -v dotfiles-sync; echo "$line"; } | crontab -
+                echo "cron: hourly dotfiles-sync installed"
+            fi ;;
+    esac
+}
+
+if [[ ${1:-} == --install-timer ]]; then
+    install_timer
+    exit
+fi
+
+pull_repo "$DOTFILES"
+pull_repo "$DOTFILES_WORK"
+if "$DOTFILES/setup" --no-timer >>"$LOG" 2>&1; then
+    log "setup ok"
+else
+    log "setup failed (exit $?)"
+    exit 1
+fi

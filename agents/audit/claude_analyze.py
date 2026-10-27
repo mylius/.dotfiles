@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Classify Claude Code tool calls and Bash commands by failure type.
 
-Read-only over /workspace/.claude/projects. Writes only under $AUDIT_OUT/claude.
+Read-only over $WORKSPACE_ROOT/.claude/projects. Writes only under $AUDIT_OUT/claude.
 Run through agents-audit, which sets AUDIT_START, AUDIT_END and AUDIT_OUT.
 """
 import collections
@@ -10,7 +10,7 @@ import json
 import os
 import re
 
-ROOT = "/workspace/.claude/projects"
+ROOT = os.path.join(os.environ.get("WORKSPACE_ROOT") or os.path.expanduser("~"), ".claude/projects")
 OUT = os.path.join(os.environ["AUDIT_OUT"], "claude")
 START, END = os.environ["AUDIT_START"], os.environ["AUDIT_END"]
 

@@ -1,12 +1,3 @@
 #!/usr/bin/env zsh
-if [[ -z $STOW_FOLDERS ]]; then
-    STOW_FOLDERS="bin,bash,cursor,agents,i3,nvim,tmux,zsh,xmodmap,env,alacritty,claude,codex"
-fi
-
-SCRIPT_DIR=${0:A:h}
-
-if [[ -z $DOTFILES ]]; then
-    DOTFILES=$SCRIPT_DIR
-fi
-
-STOW_FOLDERS=$STOW_FOLDERS DOTFILES=$DOTFILES "$DOTFILES/install"
+# Kept for the base_setup playbook; ./setup is the entry point now.
+exec "${0:A:h}/setup" "$@"

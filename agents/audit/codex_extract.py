@@ -14,7 +14,7 @@ import re
 import shlex
 import collections
 
-ROOT = "/workspace/.codex/sessions"
+ROOT = os.path.join(os.environ.get("WORKSPACE_ROOT") or os.path.expanduser("~"), ".codex/sessions")
 OUT_DIR = os.path.join(os.environ["AUDIT_OUT"], "codex", "data")
 OUT = os.path.join(OUT_DIR, "units.jsonl")
 WIN_LO, WIN_HI = os.environ["AUDIT_START"], os.environ["AUDIT_END"]

@@ -1,59 +1,49 @@
 #!/usr/bin/env zsh
+# Render one instruction file per agent (Claude, Codex) from the shared rules
+# plus the host and profile files, install hooks, and link agent tools.
+#
+# Inputs, in render order:
+#   $DOTFILES/agents/common.md          shared by every machine
+#   $DOTFILES/agents/host-{mac,linux}.md picked by OS
+#   $DOTFILES/agents/private.md         profile=private (committed)
+#   $DOTFILES_WORK/agents/work.md       profile=work (separate private repo)
+#   $DOTFILES/agents/local.md           this machine only (gitignored)
+# Bullets starting with "- Codex" go only to Codex, "- Claude" only to Claude.
 set -euo pipefail
 
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+source "$DOTFILES/env/.config/env"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}"
 LOG="$LOG_DIR/agents-sync.log"
 mkdir -p "$LOG_DIR"
 log() { print -r -- "$(date '+%F %T') $*" >>"$LOG"; }
 
-cd "$DOTFILES"
-if ! git fetch origin main --quiet; then
-  log "fetch failed"
-  exit 0
-fi
-behind=$(git rev-list --count main..origin/main)
-if (( behind > 0 )); then
-  if [[ -z $(git status --porcelain --untracked-files=no) ]]; then
-    if git pull --ff-only origin main --quiet; then
-      log "pulled $behind commits"
-    else
-      log "pull failed, not fast-forward or conflict; skipping"
-      exit 0
-    fi
-  else
-    log "dirty tree, skipped pull ($behind behind)"
-  fi
-fi
-
 case "$(uname -s)" in
   Darwin) host_file="host-mac.md" ;;
   *)      host_file="host-linux.md" ;;
 esac
-ln -sfn "$DOTFILES/agents/$host_file" "$DOTFILES/agents/host.md"
 
-if [[ -n "${CODEX_HOME:-}" ]]; then
-  codex_home="$CODEX_HOME"
-elif [[ "$(uname -s)" == "Linux" && -d /workspace/.codex ]]; then
-  codex_home="/workspace/.codex"
+typeset -a parts
+parts=("$DOTFILES/agents/common.md" "$DOTFILES/agents/$host_file")
+if [[ $DOTFILES_PROFILE == work ]]; then
+  parts+=("$DOTFILES_WORK/agents/work.md")
 else
-  codex_home="$HOME/.codex"
+  parts+=("$DOTFILES/agents/private.md")
 fi
-mkdir -p "$codex_home"
-# Each tool gets one file with the shared rules plus its own: bullets that start
-# with "- Codex" go only to Codex, and bullets that start with "- Claude" only to
-# Claude. The @file includes are inlined, since the file no longer sits next to them.
+parts+=("$DOTFILES/agents/local.md")
+
 render() {
-  local skip="$1"
-  grep -v -e '^@[A-Za-z0-9._-]*\.md$' -e "^- $skip" "$DOTFILES/agents/common.md"
-  local extra
-  for extra in host.md wayve.md; do
-    if [[ -f "$DOTFILES/agents/$extra" ]]; then
-      echo
-      grep -v "^- $skip" "$DOTFILES/agents/$extra"
-    fi
+  local skip="$1" part first=1
+  for part in "${parts[@]}"; do
+    [[ -f $part ]] || continue
+    (( first )) || echo
+    first=0
+    grep -v -e '^@[A-Za-z0-9._-]*\.md$' -e "^- $skip" "$part" || true
   done
 }
+
+codex_home="${CODEX_HOME:-$WORKSPACE_ROOT/.codex}"
+mkdir -p "$codex_home"
 render Claude > "$codex_home/AGENTS.md"
 cp "$DOTFILES/agents/codex-hooks.json" "$codex_home/hooks.json.new"
 if ! cmp -s "$codex_home/hooks.json.new" "$codex_home/hooks.json"; then
@@ -63,35 +53,28 @@ else
   rm "$codex_home/hooks.json.new"
 fi
 
-if [[ "$(uname -s)" == "Linux" && -d /workspace/.claude ]]; then
-  claude_dir="/workspace/.claude"
-else
-  claude_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-fi
+claude_dir="${CLAUDE_CONFIG_DIR:-$WORKSPACE_ROOT/.claude}"
 mkdir -p "$claude_dir"
-# mv replaces the old symlink to common.md instead of writing through it.
+# mv replaces an old symlink to common.md instead of writing through it.
 render Codex > "$claude_dir/CLAUDE.md.new"
 mv "$claude_dir/CLAUDE.md.new" "$claude_dir/CLAUDE.md"
 
 # Agent tools on PATH.
-if [[ "$(uname -s)" == "Linux" && -d /workspace/.local/bin ]]; then
-  bin_dir="/workspace/.local/bin"
-else
-  bin_dir="$HOME/.local/bin"
-fi
+bin_dir="$WORKSPACE_ROOT/.local/bin"
 mkdir -p "$bin_dir"
-for tool in agents-audit; do
+for tool in agents-sync agents-skills-sync agents-audit; do
   ln -sfn "$DOTFILES/agents/.local/bin/$tool" "$bin_dir/$tool"
 done
-# Machine-local tools (gitignored), such as work-specific helpers.
-for tool in "$DOTFILES"/agents/wayve-local/bin/*(N); do
-  ln -sfn "$tool" "$bin_dir/${tool:t}"
-done
-# Machine-local setup scripts (gitignored), such as installing work tools; each
+# Work-only tools and setup scripts from the private repo; each setup script
 # gets the bin directory as its argument.
-for script in "$DOTFILES"/agents/wayve-local/sync.d/*(N); do
-  [[ -x "$script" ]] && { "$script" "$bin_dir" || log "${script:t} failed"; }
-done
+if [[ $DOTFILES_PROFILE == work && -d $DOTFILES_WORK ]]; then
+  for tool in "$DOTFILES_WORK"/agents/bin/*(N); do
+    ln -sfn "$tool" "$bin_dir/${tool:t}"
+  done
+  for script in "$DOTFILES_WORK"/agents/sync.d/*(N); do
+    [[ -x "$script" ]] && { "$script" "$bin_dir" || log "${script:t} failed"; }
+  done
+fi
 if command -v tskr >/dev/null; then
   # Threads started before the rename still call bgtask.
   ln -sfn "$(command -v tskr)" "$bin_dir/bgtask"
@@ -99,4 +82,4 @@ if command -v tskr >/dev/null; then
     tskr daemon --ensure >/dev/null || log "tskr daemon failed to start"
   fi
 fi
-log "synced codex=$codex_home claude=$claude_dir"
+log "synced profile=$DOTFILES_PROFILE codex=$codex_home claude=$claude_dir"

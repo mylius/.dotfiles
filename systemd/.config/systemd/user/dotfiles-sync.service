@@ -1,0 +1,6 @@
+[Unit]
+Description=Pull and install the dotfiles
+
+[Service]
+Type=oneshot
+ExecStart=%h/.dotfiles/bin/.local/bin/dotfiles-sync

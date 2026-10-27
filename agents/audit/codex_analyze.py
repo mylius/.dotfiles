@@ -9,7 +9,7 @@ import re
 BASE = os.path.join(os.environ["AUDIT_OUT"], "codex")
 UNITS = os.path.join(BASE, "data", "units.jsonl")
 REPORT = os.path.join(BASE, "report.md")
-ROOT = "/workspace/.codex/sessions"
+ROOT = os.path.join(os.environ.get("WORKSPACE_ROOT") or os.path.expanduser("~"), ".codex/sessions")
 WIN_LO, WIN_HI = os.environ["AUDIT_START"], os.environ["AUDIT_END"]
 
 ATTRIB = {"ok", "expected", "sandbox", "network", "user-denied", "blocked", "real"}
@@ -138,7 +138,7 @@ def main():
     w = out.append
     stats = json.load(open(os.path.join(BASE, "data", "stats.json")))
     w("## 0. Scope, method, and limits\n")
-    w("- Source: %d rollout files under /workspace/.codex/sessions (main and sub-agent threads). Window: call timestamp UTC date %s to %s. "
+    w("- Source: %d rollout files under $WORKSPACE_ROOT/.codex/sessions (main and sub-agent threads). Window: call timestamp UTC date %s to %s. "
       "In-window tool calls: %d; out of window: %d. Malformed JSON lines skipped: %d. Duplicate call IDs across files: none found. "
       "The session directory was still being written during this run, so out-of-window counts can grow; in-window results do not change." % (
           stats["files"], WIN_LO, WIN_HI, stats["in_window_calls"], stats["out_of_window_calls"], stats["bad_json_lines"]))

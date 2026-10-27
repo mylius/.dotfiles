@@ -5,7 +5,7 @@ Codex can't hook its own `write_stdin` polls, so this works on the shell side.
 It denies, with a reason, the first attempt at:
 - a long-running command started directly instead of through `tskr run`
   (Bazel builds and tests, full Go, pytest, and JS test suites, plus any regex
-  listed in agents/wayve-local/slow-commands, one per line),
+  listed in $DOTFILES_WORK/agents/slow-commands, one per line),
 - `tskr wait` in the Codex CLI, where the notification starts the next turn,
 - `sleep N` (N >= 5) and sleep-based polling loops.
 Running the identical command again within 10 minutes is allowed, so subagents
@@ -28,7 +28,8 @@ RETRY_WINDOW = 600
 
 
 def local_slow_patterns():
-    path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "wayve-local", "slow-commands")
+    work = os.environ.get("DOTFILES_WORK") or os.path.expanduser("~/.dotfiles-work")
+    path = os.path.join(work, "agents", "slow-commands")
     try:
         with open(path) as f:
             lines = [l.strip() for l in f]

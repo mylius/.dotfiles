@@ -1,9 +1,44 @@
+# Sourced by zsh, bash, and the dotfiles scripts. Keep it POSIX-ish: no zsh-only syntax.
 
-# Keep standards-compliant application state off the NFS home directory.
-export XDG_CONFIG_HOME=/workspace/.config
-export XDG_CACHE_HOME=/workspace/.cache
-export XDG_DATA_HOME=/workspace/.local/share
-export XDG_STATE_HOME=/workspace/.local/state
+export DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
+export DOTFILES_WORK="${DOTFILES_WORK:-$HOME/.dotfiles-work}"
+
+# Machine profile: "work" or "private". Written by `setup --profile`, never committed.
+if [ -z "${DOTFILES_PROFILE:-}" ] && [ -r "$HOME/.config/dotfiles/profile" ]; then
+    read -r DOTFILES_PROFILE < "$HOME/.config/dotfiles/profile"
+fi
+export DOTFILES_PROFILE="${DOTFILES_PROFILE:-private}"
+
+# Fast local disk for caches, worktrees, and agent state. The work VPN boxes
+# mount the home directory over NFS and give /workspace on nvme; everywhere
+# else the home directory is the workspace.
+if [ -z "${WORKSPACE_ROOT:-}" ]; then
+    if [ -d /workspace ] && [ -w /workspace ]; then
+        WORKSPACE_ROOT=/workspace
+    else
+        WORKSPACE_ROOT=$HOME
+    fi
+fi
+export WORKSPACE_ROOT
+
+if [ "$WORKSPACE_ROOT" = "$HOME" ]; then
+    # Drop /workspace values inherited from a shell that ran the old config.
+    for _v in XDG_CONFIG_HOME XDG_CACHE_HOME XDG_DATA_HOME XDG_STATE_HOME CODEX_HOME PI_CODING_AGENT_DIR PI_CURSOR_SDK_STATE_ROOT; do
+        eval "_val=\${$_v:-}"
+        case $_val in /workspace/*) unset "$_v" ;; esac
+    done
+    unset _v _val
+else
+    # Keep standards-compliant application state off the NFS home directory.
+    export XDG_CONFIG_HOME="$WORKSPACE_ROOT/.config"
+    export XDG_CACHE_HOME="$WORKSPACE_ROOT/.cache"
+    export XDG_DATA_HOME="$WORKSPACE_ROOT/.local/share"
+    export XDG_STATE_HOME="$WORKSPACE_ROOT/.local/state"
+    # Agent homes follow the workspace too; /home is slow on this setup.
+    export CODEX_HOME="$WORKSPACE_ROOT/.codex"
+    export PI_CODING_AGENT_DIR="$WORKSPACE_ROOT/.pi/agent"
+    export PI_CURSOR_SDK_STATE_ROOT="$WORKSPACE_ROOT/.local/share/pi-cursor-sdk"
+fi
 
 addToPath() {
     if [[ "$PATH" != *"$1"* ]]; then
@@ -18,7 +53,7 @@ addToPathFront() {
 }
 
 addToPathFront "$HOME/.local/.npm-global/bin"
-addToPathFront "/workspace/.local/bin"
-
-# Keep Pi's writable state on the local workspace disk, not the NFS home.
-export PI_CODING_AGENT_DIR=/workspace/.pi/agent
+addToPathFront "$HOME/.local/bin"
+if [ "$WORKSPACE_ROOT" != "$HOME" ]; then
+    addToPathFront "$WORKSPACE_ROOT/.local/bin"
+fi

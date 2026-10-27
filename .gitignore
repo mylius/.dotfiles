@@ -1,5 +1,12 @@
-# Project-specific configs (use .example files as templates)
-agents/wayve.md
-agents/wayve-local/
-agents/host.md
+# Machine-local agent rules (work rules live in the separate dotfiles-work repo)
+agents/local.md
+# Rendered from *.tmpl by ./install
+sesh/.config/sesh/sesh.toml
+worktrunk/.config/worktrunk/config.toml
+# Tool-written backups and clones
+karabiner/.config/karabiner/automatic_backups/
+karabiner/.config/karabiner/*.before-*
+ghostty/.config/ghostty/ghostty-shaders/
+*.backup-*
+.idea/
 .DS_Store

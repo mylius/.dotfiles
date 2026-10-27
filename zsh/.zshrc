@@ -1,9 +1,10 @@
-# Basic environment setup
+# Basic environment setup. ~/.config/env detects the machine profile and
+# workspace root and exports WORKSPACE_ROOT, DOTFILES_PROFILE, and the XDG dirs.
+source "$HOME/.zsh_profile"
 if [[ "$OSTYPE" == darwin* ]]; then
     export PATH="/usr/local/opt/libpq/bin:/opt/local/bin:$PATH"
 fi
 export PATH="$HOME/.cargo/bin:$PATH"
-export PATH="/workspace/.local/bin:$HOME/.local/bin:$PATH"
 export PATH="$HOME/go/bin:$PATH"  # Static GOPATH instead of $(go env GOPATH)
 
 for conda_root in "$HOME/miniforge3" "$HOME/miniconda3"; do
@@ -78,7 +79,7 @@ if [ -f "$HOME/.deno/env" ]; then
 fi
 
 # Initialize tools with caching
-export _ZO_EXCLUDE_DIRS="/workspace/wt:/workspace/wt/*:/workspace/wt/*/*"
+export _ZO_EXCLUDE_DIRS="$WORKSPACE_ROOT/wt:$WORKSPACE_ROOT/wt/*:$WORKSPACE_ROOT/wt/*/*"
 _cache_init "zoxide" "zoxide init zsh"
 _cache_init "wt" "wt config shell --shell zsh"
 _cache_init "sesh" "sesh completion zsh"
@@ -138,24 +139,13 @@ setopt APPEND_HISTORY INC_APPEND_HISTORY HIST_IGNORE_ALL_DUPS HIST_REDUCE_BLANKS
 if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)"; fi
 
 # bun completions
-[ -s "/home/jangabrielmylius/.bun/_bun" ] && source "/home/jangabrielmylius/.bun/_bun"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
-# Use workspace-backed Codex home; /home is slow on this setup.
-export CODEX_HOME=/workspace/.codex
-
-# Keep Pi's writable state on the local workspace disk, not the NFS home.
-export PI_CODING_AGENT_DIR=/workspace/.pi/agent
-export PI_CURSOR_SDK_STATE_ROOT=/workspace/.local/share/pi-cursor-sdk
-
 # herdr session switch supervisor
 herdr() {
     "$HOME/.local/bin/herdr-switch" "$@"
 }
-
-# >>> Codex installer >>>
-export PATH="/home/jangabrielmylius/.local/bin:$PATH"
-# <<< Codex installer <<<
