@@ -28,7 +28,12 @@ esac
 typeset -a parts
 parts=("$DOTFILES/agents/common.md" "$DOTFILES/agents/$host_file")
 if [[ $DOTFILES_PROFILE == work ]]; then
-  parts+=("$DOTFILES_WORK/agents/work")
+  if [[ -d $DOTFILES_WORK ]]; then
+    parts+=("$DOTFILES_WORK/agents/work")
+  else
+    # Transitional: the old gitignored work rules, until dotfiles-work is cloned.
+    parts+=("$DOTFILES/agents/wayve")
+  fi
 else
   parts+=("$DOTFILES/agents/private")
 fi

@@ -1,4 +1,7 @@
-# Machine-local agent rules (work rules live in the separate dotfiles-work repo)
+# Machine-local agent rules (work rules live in the separate dotfiles-work repo;
+# wayve.md and wayve-local/ are the pre-split names, still read until it is cloned)
+agents/wayve.md
+agents/wayve-local/
 agents/local.md
 agents/local-claude.md
 agents/local-codex.md

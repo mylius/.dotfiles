@@ -7,6 +7,11 @@ export DOTFILES_WORK="${DOTFILES_WORK:-$HOME/.dotfiles-work}"
 if [ -z "${DOTFILES_PROFILE:-}" ] && [ -r "$HOME/.config/dotfiles/profile" ]; then
     read -r DOTFILES_PROFILE < "$HOME/.config/dotfiles/profile"
 fi
+# Transitional: a machine with the old gitignored work rules is a work box
+# until ./setup --profile has been run there.
+if [ -z "${DOTFILES_PROFILE:-}" ] && [ -f "$DOTFILES/agents/wayve.md" ]; then
+    DOTFILES_PROFILE=work
+fi
 export DOTFILES_PROFILE="${DOTFILES_PROFILE:-private}"
 
 # Fast local disk for caches, worktrees, and agent state. The work VPN boxes
