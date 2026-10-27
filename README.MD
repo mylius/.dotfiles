@@ -18,9 +18,10 @@ macOS, a systemd user timer or cron on Linux) that pulls `main` and re-runs
 
 - One stow package per tool, laid out relative to `$HOME` (`zsh/.zshrc`,
   `ghostty/.config/ghostty/config`).
-- `env/.config/env` is sourced by every shell and script. It detects
-  `WORKSPACE_ROOT` (`/workspace` on the work VPN boxes, else `$HOME`) and sets
-  the XDG and agent home directories only when the workspace is separate.
+- `env/.config/env` is sourced by every shell and script. It sets
+  `WORKSPACE_ROOT` to `/workspace` on work Linux boxes that have it, else
+  `$HOME`, and sets the XDG and agent home directories only when the workspace
+  is separate.
 - Files ending in `.tmpl` are rendered by `install` with `@WORKSPACE_ROOT@`,
   `@HOME@`, `@DOTFILES@`, and `@DOTFILES_PROFILE@` replaced; the rendered file
   is gitignored and linked.
@@ -38,7 +39,9 @@ macOS, a systemd user timer or cron on Linux) that pulls `main` and re-runs
 | `~/.dotfiles-work/agents/work.md` | profile `work` |
 | `agents/local.md` | this machine only, gitignored |
 
-Bullets starting with `- Claude` or `- Codex` go only to that agent.
+`private`, `work`, and `local` may each have a `-claude.md` and `-codex.md`
+sibling that only that tool receives. Bullets starting with `- Claude` or
+`- Codex` go only to that agent.
 
 Skills: `skills/` is linked into `~/.agents/skills` everywhere,
 `skills-private/` on private machines, and `~/.dotfiles-work/skills/` on work

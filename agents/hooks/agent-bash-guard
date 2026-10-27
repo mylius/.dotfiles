@@ -2,7 +2,8 @@
 """PreToolUse guard for agent shell commands (Claude Code and Codex).
 
 Reads the hook JSON on stdin and denies:
-- `git push` of a branch that is not main/master and not prefixed jangabrielmylius/.
+- `git push` of a branch that is not main/master and not prefixed jangabrielmylius/
+  (off when AGENT_PUSH_GUARD=0).
 - `pkill -f PATTERN` where PATTERN would also match the agent's own shell.
 - `kill $(pgrep -f PATTERN)` and `pgrep -f PATTERN | xargs kill`, for the same reason.
 Anything it cannot parse is allowed.
@@ -62,6 +63,8 @@ def current_branch(cwd):
 
 
 def check_push(argv, cwd):
+    if os.environ.get("AGENT_PUSH_GUARD") == "0":
+        return
     # argv starts at "git"; collect -C and find "push".
     i, git_dir = 1, cwd
     while i < len(argv) and argv[i] != "push":

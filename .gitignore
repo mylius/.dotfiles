@@ -1,5 +1,7 @@
 # Machine-local agent rules (work rules live in the separate dotfiles-work repo)
 agents/local.md
+agents/local-claude.md
+agents/local-codex.md
 # Rendered from *.tmpl by ./install
 sesh/.config/sesh/sesh.toml
 worktrunk/.config/worktrunk/config.toml

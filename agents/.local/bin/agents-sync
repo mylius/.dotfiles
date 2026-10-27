@@ -8,7 +8,9 @@
 #   $DOTFILES/agents/private.md         profile=private (committed)
 #   $DOTFILES_WORK/agents/work.md       profile=work (separate private repo)
 #   $DOTFILES/agents/local.md           this machine only (gitignored)
-# Bullets starting with "- Codex" go only to Codex, "- Claude" only to Claude.
+# Each of private, work, and local may also have a -claude.md and -codex.md
+# sibling that goes to that tool only. Bullets starting with "- Codex" go only
+# to Codex, "- Claude" only to Claude.
 set -euo pipefail
 
 DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
@@ -26,19 +28,23 @@ esac
 typeset -a parts
 parts=("$DOTFILES/agents/common.md" "$DOTFILES/agents/$host_file")
 if [[ $DOTFILES_PROFILE == work ]]; then
-  parts+=("$DOTFILES_WORK/agents/work.md")
+  parts+=("$DOTFILES_WORK/agents/work")
 else
-  parts+=("$DOTFILES/agents/private.md")
+  parts+=("$DOTFILES/agents/private")
 fi
-parts+=("$DOTFILES/agents/local.md")
+parts+=("$DOTFILES/agents/local")
 
 render() {
-  local skip="$1" part first=1
+  local skip="$1" tool part first=1
+  [[ $skip == Claude ]] && tool=codex || tool=claude
   for part in "${parts[@]}"; do
+    [[ $part == *.md ]] || part="$part.md $part-$tool.md"
+    for part in ${=part}; do
     [[ -f $part ]] || continue
     (( first )) || echo
     first=0
     grep -v -e '^@[A-Za-z0-9._-]*\.md$' -e "^- $skip" "$part" || true
+    done
   done
 }
 

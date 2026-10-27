@@ -145,6 +145,14 @@ if command -v wt >/dev/null 2>&1; then eval "$(command wt config shell init zsh)
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
+if [[ $WORKSPACE_ROOT == $HOME ]]; then
+    # Directories the tskr daemon may run sandboxed tasks in.
+    export TSKR_ROOTS="$HOME/.t3/worktrees:$HOME/projects:/tmp"
+fi
+
+# OpenClaw completion
+[ -s "$HOME/.openclaw/completions/openclaw.zsh" ] && source "$HOME/.openclaw/completions/openclaw.zsh"
+
 # herdr session switch supervisor
 herdr() {
     "$HOME/.local/bin/herdr-switch" "$@"

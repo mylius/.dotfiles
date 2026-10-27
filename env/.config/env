@@ -11,9 +11,9 @@ export DOTFILES_PROFILE="${DOTFILES_PROFILE:-private}"
 
 # Fast local disk for caches, worktrees, and agent state. The work VPN boxes
 # mount the home directory over NFS and give /workspace on nvme; everywhere
-# else the home directory is the workspace.
+# else the home directory is the workspace, even if a /workspace dir exists.
 if [ -z "${WORKSPACE_ROOT:-}" ]; then
-    if [ -d /workspace ] && [ -w /workspace ]; then
+    if [ "$DOTFILES_PROFILE" = work ] && [ -d /workspace ] && [ -w /workspace ]; then
         WORKSPACE_ROOT=/workspace
     else
         WORKSPACE_ROOT=$HOME
