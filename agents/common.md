@@ -68,6 +68,9 @@ To launch one:
 
 # Shell commands
 
+- Prefer `rg` over `grep` for searches.
+- Batch small independent searches, reads, and checks that are already ready into one tool call when practical. Do not wait for more work to form a batch.
+- Prefer targeted output when appropriate, such as relevant matches, line ranges, or summaries, while preserving the context needed for correctness.
 - A test, build, or lint command piped into `tail`, `head`, or `grep` exits with the status of the last command in the pipe, so a failing run looks like a pass. Start the command with `set -o pipefail`, or write the full log to a file, check the runner's exit code, then print the tail.
 - zsh fails on a glob that matches nothing (`no matches found`). Quote patterns meant for another tool, such as `rg -g '*.ts'`. To list files that may not exist, use `find DIR -maxdepth 1 -name 'PATTERN'`; the `(N)` qualifier doesn't work in Claude's Bash tool, and `ls` with an empty glob lists the current directory. Quote words that start with `=`, such as `echo '====='`; zsh expands `=word` to a command path.
 - Backticks inside double quotes run as commands. Use single quotes for text that contains backticks.
