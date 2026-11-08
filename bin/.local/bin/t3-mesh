@@ -1,0 +1,226 @@
+#!/usr/bin/env zsh
+# Join this machine to the T3 Code machines on the tailnet, so agents on each
+# one can work on the others. Links are one-way in T3 Code, so every pair of
+# machines needs a link in each direction.
+#
+#   t3-mesh install              install t3 and its background service, reachable over the tailnet
+#   t3-mesh link HOST...         link this machine and HOST both ways over SSH
+#   t3-mesh link --all           the same for every tailnet machine running T3 Code and not linked yet
+#   t3-mesh invite               mint a pairing code here and print the `t3-mesh join` command for another machine
+#   t3-mesh join URL CODE        link this machine to URL, then print the command that links URL back here
+#   t3-mesh status               linked machines, and tailnet machines running T3 Code that are not linked
+#
+# Environment: T3CODE_CHANNEL (default nightly), T3_MESH_ACCESS (default approval-required),
+# T3_MESH_PORT (default 3773, the port other machines serve on).
+set -euo pipefail
+
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
+T3_HOME=${T3CODE_HOME:-$HOME/.t3}
+ACCESS=${T3_MESH_ACCESS:-approval-required}
+PEER_PORT=${T3_MESH_PORT:-3773}
+TTL=10m
+
+die() { print -r -- "t3-mesh: $*" >&2; exit 1; }
+say() { print -r -- "==> $*"; }
+
+tailscale_cmd() {
+    if command -v tailscale >/dev/null; then
+        tailscale "$@"
+    elif [[ -x /Applications/Tailscale.app/Contents/MacOS/Tailscale ]]; then
+        /Applications/Tailscale.app/Contents/MacOS/Tailscale "$@"
+    else
+        die "tailscale is not installed; install it and run \`tailscale up\`"
+    fi
+}
+
+tailnet_json() {
+    local json
+    json=$(tailscale_cmd status --json 2>/dev/null) || die "tailscale is not running; run \`tailscale up\`"
+    [[ $(jq -r .BackendState <<<"$json") == Running ]] || die "tailscale is not logged in; run \`tailscale up\`"
+    print -r -- "$json"
+}
+
+# The t3 launcher, or the version the background service runs when there is no launcher.
+t3_bin() {
+    if whence -p t3 >/dev/null; then
+        whence -p t3
+        return
+    fi
+    local active
+    active=$(jq -r '.activeVersion // empty' "$T3_HOME/runtime/service-state.json" 2>/dev/null || true)
+    [[ -n $active && -x $T3_HOME/runtime/versions/$active/t3 ]] || return 1
+    print -r -- "$T3_HOME/runtime/versions/$active/t3"
+}
+
+t3() {
+    local bin
+    bin=$(t3_bin) || die "t3 is not installed here; run \`t3-mesh install\`"
+    "$bin" "$@"
+}
+
+self_name() {
+    tailnet_json | jq -r .Self.HostName
+}
+
+self_url() {
+    local host port
+    host=$(tailnet_json | jq -r '.Self.DNSName | rtrimstr(".")')
+    port=$(jq -r '.port // empty' "$T3_HOME/userdata/server-runtime.json" 2>/dev/null || true)
+    print -r -- "http://$host:${port:-3773}"
+}
+
+# Tailnet DNS name for HOST, which may be a short name, a DNS name, or a URL.
+peer_url() {
+    local host=$1
+    [[ $host == http://* || $host == https://* ]] && { print -r -- "$host"; return; }
+    local dns
+    dns=$(tailnet_json | jq -r --arg h "${host%%.*}" \
+        '[.Peer[] | select((.DNSName | split(".")[0]) == ($h | ascii_downcase) or .HostName == $h) | .DNSName | rtrimstr(".")][0] // empty')
+    [[ -n $dns ]] || die "no tailnet machine named $host"
+    print -r -- "http://$dns:$PEER_PORT"
+}
+
+linked_urls() {
+    t3 environment list --json 2>/dev/null | jq -r '.[].urls[]' || true
+}
+
+is_linked() {
+    local url=$1
+    linked_urls | grep -qxF -- "$url"
+}
+
+mint_code() {
+    t3 auth pairing create --ttl "$TTL" --label "$1" --json | jq -r .credential
+}
+
+cmd_install() {
+    command -v jq >/dev/null || die "jq is required"
+    tailnet_json >/dev/null
+    if ! t3_bin >/dev/null; then
+        say "Installing t3 (${T3CODE_CHANNEL:-nightly} channel)"
+        curl -fsSL https://t3.codes/install.sh | T3CODE_CHANNEL=${T3CODE_CHANNEL:-nightly} sh
+        hash -r
+    fi
+    local st
+    st=$(t3 status --json)
+    if [[ $(jq -r .service.installed <<<"$st") == true && $(jq -r .lan.enabled <<<"$st") == true ]]; then
+        say "t3 service is installed and reachable over the tailnet"
+    else
+        # --lan: other machines reach it on the tailnet address; a pairing code is still required.
+        say "Installing the t3 service with tailnet access"
+        t3 up --yes --lan
+    fi
+    say "This machine answers at $(self_url)"
+    print -r -- "Next: \`t3-mesh link --all\`, or \`t3-mesh invite\` on a machine without SSH."
+}
+
+# Run `t3 ARGS` on HOST over SSH. ARGS is a shell string; the first line of
+# stdin is available to it as "$code", so secrets stay off the command line.
+ssh_t3() {
+    local host=$1 args=$2
+    ssh -o BatchMode=yes -o ConnectTimeout=5 "$host" \
+        'read -r code || true; t3=$(command -v t3 || echo "$HOME/.local/bin/t3"); "$t3" '"$args"
+}
+
+link_host() {
+    local host=$1 url self ssh_host code
+    url=$(peer_url "$host")
+    self=$(self_url)
+    ssh_host=${${url#*://}%:*}
+    [[ $url == "$self" ]] && { say "skipping $host: this machine"; return 0; }
+
+    if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$ssh_host" true 2>/dev/null; then
+        print -r -- "Can't SSH to $ssh_host. Link it by hand instead:"
+        print -r -- "  on $ssh_host: t3-mesh invite"
+        print -r -- "  here: the \`t3-mesh join ...\` command it prints"
+        return 1
+    fi
+
+    if is_linked "$url"; then
+        say "$url is already linked from here"
+    else
+        say "Linking here -> $url"
+        code=$(ssh_t3 "$ssh_host" "auth pairing create --ttl $TTL --label ${(q)$(self_name)} --json" </dev/null | jq -r .credential)
+        [[ -n $code && $code != null ]] || die "could not mint a pairing code on $ssh_host"
+        t3 environment link "$url" --pairing-code "$code" --access "$ACCESS"
+    fi
+
+    if ssh_t3 "$ssh_host" "environment list --json" </dev/null | jq -e --arg u "$self" 'any(.[].urls[]; . == $u)' >/dev/null; then
+        say "$ssh_host already links back here"
+    else
+        say "Linking $ssh_host -> $self"
+        code=$(mint_code "$ssh_host")
+        print -r -- "$code" | ssh_t3 "$ssh_host" "environment link ${(q)self} --pairing-code \"\$code\" --access ${(q)ACCESS}"
+    fi
+}
+
+# Online tailnet machines (not phones) whose T3 Code port answers.
+t3_peers() {
+    local dns
+    tailnet_json | jq -r '.Peer[] | select(.Online and (.OS | IN("linux", "macOS", "windows"))) | .DNSName | rtrimstr(".")' |
+    while read -r dns; do
+        if curl -fsS -m 3 -o /dev/null "http://$dns:$PEER_PORT/" 2>/dev/null; then
+            print -r -- "$dns"
+        fi
+    done
+}
+
+cmd_link() {
+    (( $# )) || die "usage: t3-mesh link HOST... | --all"
+    local -a hosts
+    if [[ $1 == --all ]]; then
+        hosts=(${(f)"$(t3_peers)"})
+        (( ${#hosts} )) || { say "no other tailnet machine is running T3 Code"; return 0; }
+    else
+        hosts=("$@")
+    fi
+    local host failed=0
+    for host in $hosts; do
+        link_host "$host" || failed=1
+    done
+    return $failed
+}
+
+cmd_invite() {
+    local code
+    code=$(mint_code "invite from $(self_name)")
+    print -r -- "Run this on the other machine within $TTL:"
+    print -r -- ""
+    print -r -- "  t3-mesh join $(self_url) $code"
+}
+
+cmd_join() {
+    local one_way=0
+    [[ ${1:-} == --one-way ]] && { one_way=1; shift; }
+    (( $# == 2 )) || die "usage: t3-mesh join [--one-way] URL CODE"
+    local url=$1 code=$2
+    say "Linking here -> $url"
+    t3 environment link "$url" --pairing-code "$code" --access "$ACCESS"
+    (( one_way )) && return 0
+    local back
+    back=$(mint_code "join from $(self_name)")
+    print -r -- ""
+    print -r -- "Now run this on ${${url#*://}%%[.:]*} within $TTL, so it can work here too:"
+    print -r -- ""
+    print -r -- "  t3-mesh join --one-way $(self_url) $back"
+}
+
+cmd_status() {
+    say "Linked from here"
+    t3 environment list
+    local linked dns
+    linked=$(linked_urls)
+    say "Tailnet machines running T3 Code that are not linked from here"
+    t3_peers | while read -r dns; do
+        grep -qxF -- "http://$dns:$PEER_PORT" <<<"$linked" || print -r -- "  $dns"
+    done
+}
+
+case ${1:-} in
+    install) shift; cmd_install "$@" ;;
+    link)    shift; cmd_link "$@" ;;
+    invite)  shift; cmd_invite "$@" ;;
+    join)    shift; cmd_join "$@" ;;
+    status)  shift; cmd_status "$@" ;;
+    *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
