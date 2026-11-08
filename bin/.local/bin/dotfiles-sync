@@ -1,6 +1,7 @@
 #!/usr/bin/env zsh
 # Pull the dotfiles (and the private work repo when present), then re-run
-# ./setup so links, rendered templates, and agent files match the repo.
+# ./setup and agents-skills-sync so links, rendered templates, agent files, and
+# skills match the repo.
 # Runs hourly from launchd (macOS) or a systemd user timer (Linux).
 #
 #   dotfiles-sync                  pull and install
@@ -77,6 +78,14 @@ if "$DOTFILES/setup" --no-timer >>"$LOG" 2>&1; then
 else
     log "setup failed (exit $?)"
     exit 1
+fi
+
+# Links new dotfiles skills and refreshes the npm-distributed ones. Stdin is closed
+# because some installers wait for input that never comes.
+if "$DOTFILES/agents/.local/bin/agents-skills-sync" </dev/null >>"$LOG" 2>&1; then
+    log "agents-skills-sync ok"
+else
+    log "agents-skills-sync failed (exit $?)"
 fi
 
 # T3 Code links expire after 30 days; once a day, re-link the ones due.

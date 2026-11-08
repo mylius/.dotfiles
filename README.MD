@@ -12,7 +12,7 @@ git clone git@github.com:mylius/.dotfiles.git ~/.dotfiles
 `setup` picks stow packages by OS and profile, links them, renders the agent
 instruction files, and installs an hourly `dotfiles-sync` timer (launchd on
 macOS, a systemd user timer or cron on Linux) that pulls `main` and re-runs
-`setup`. The profile is stored in `~/.config/dotfiles/profile`.
+`setup` and `agents-skills-sync`. The profile is stored in `~/.config/dotfiles/profile`.
 
 ## Layout
 
