@@ -54,7 +54,8 @@ for dir in "${skill_dirs[@]}"; do
   done
 done
 
-for d in "$HOME/.agents/skills"/*(N/); do
+# -/ follows symlinks: skills from the dotfiles arrive here as links.
+for d in "$HOME/.agents/skills"/*(N-/); do
   name="${d:t}"
   [[ "$name" = "synced" ]] && continue
   [[ -e "$claude_skills/$name" ]] || ln -s "$d" "$claude_skills/$name"
