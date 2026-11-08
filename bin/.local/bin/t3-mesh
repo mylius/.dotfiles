@@ -4,20 +4,26 @@
 # machines needs a link in each direction.
 #
 #   t3-mesh install              install t3 and its background service, reachable over the tailnet
-#   t3-mesh link HOST...         link this machine and HOST both ways over SSH
-#   t3-mesh link --all           the same for every tailnet machine running T3 Code and not linked yet
+#   t3-mesh link HOST...         link this machine and HOST both ways over SSH (HOST may be user@host)
+#   t3-mesh link --all           the same for every tailnet machine running T3 Code
+#   t3-mesh renew                re-link, both ways, every linked machine reachable over SSH whose link is due
 #   t3-mesh invite               mint a pairing code here and print the `t3-mesh join` command for another machine
 #   t3-mesh join URL CODE        link this machine to URL, then print the command that links URL back here
 #   t3-mesh status               linked machines, and tailnet machines running T3 Code that are not linked
 #
+# T3 Code expires links 30 days after linking and never extends them, so
+# `link` and `renew` re-link any direction expiring within T3_MESH_RENEW_DAYS
+# (default 7). dotfiles-sync runs `renew` once a day.
+#
 # Environment: T3CODE_CHANNEL (default nightly), T3_MESH_ACCESS (default approval-required),
-# T3_MESH_PORT (default 3773, the port other machines serve on).
+# T3_MESH_PORT (default 3773, the port other machines serve on), T3_MESH_SSH_USER.
 set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$PATH"
 T3_HOME=${T3CODE_HOME:-$HOME/.t3}
 ACCESS=${T3_MESH_ACCESS:-approval-required}
 PEER_PORT=${T3_MESH_PORT:-3773}
+RENEW_DAYS=${T3_MESH_RENEW_DAYS:-7}
 TTL=10m
 
 die() { print -r -- "t3-mesh: $*" >&2; exit 1; }
@@ -84,11 +90,6 @@ linked_urls() {
     t3 environment list --json 2>/dev/null | jq -r '.[].urls[]' || true
 }
 
-is_linked() {
-    local url=$1
-    linked_urls | grep -qxF -- "$url"
-}
-
 mint_code() {
     t3 auth pairing create --ttl "$TTL" --label "$1" --json | jq -r .credential
 }
@@ -122,36 +123,71 @@ ssh_t3() {
         'read -r code || true; t3=$(command -v t3 || echo "$HOME/.local/bin/t3"); "$t3" '"$args"
 }
 
+# Succeeds when LIST (`t3 environment list --json`) has no link to URL, or
+# its link expires within RENEW_DAYS.
+needs_link() {
+    jq -e --arg u "$2" --argjson d "$RENEW_DAYS" '
+        [.[] | select(any(.urls[]; . == $u))
+             | .expiresAt | sub("\\.[0-9]+Z$"; "Z") | fromdateiso8601] as $exp
+        | ($exp | length) == 0 or ($exp | max) < (now + $d * 86400)' <<<"$1" >/dev/null
+}
+
+# Link this machine and HOST both ways over SSH, re-linking a direction that
+# is missing or close to expiring. HOST may be user@host. With QUIET=1, a
+# machine without SSH is reported in one line.
 link_host() {
-    local host=$1 url self ssh_host code
-    url=$(peer_url "$host")
+    local host=$1 quiet=${2:-0} url self ssh_host code list
+    url=$(peer_url "${host#*@}")
     self=$(self_url)
     ssh_host=${${url#*://}%:*}
+    if [[ $host == *@* ]]; then
+        ssh_host="${host%%@*}@$ssh_host"
+    elif [[ -n ${T3_MESH_SSH_USER:-} ]]; then
+        ssh_host="$T3_MESH_SSH_USER@$ssh_host"
+    fi
     [[ $url == "$self" ]] && { say "skipping $host: this machine"; return 0; }
 
     if ! ssh -o BatchMode=yes -o ConnectTimeout=5 "$ssh_host" true 2>/dev/null; then
+        if (( quiet )); then
+            say "can't SSH to $ssh_host; its links were not checked"
+            return 1
+        fi
         print -r -- "Can't SSH to $ssh_host. Link it by hand instead:"
         print -r -- "  on $ssh_host: t3-mesh invite"
         print -r -- "  here: the \`t3-mesh join ...\` command it prints"
         return 1
     fi
 
-    if is_linked "$url"; then
-        say "$url is already linked from here"
-    else
+    if needs_link "$(t3 environment list --json)" "$url"; then
         say "Linking here -> $url"
         code=$(ssh_t3 "$ssh_host" "auth pairing create --ttl $TTL --label ${(q)$(self_name)} --json" </dev/null | jq -r .credential)
         [[ -n $code && $code != null ]] || die "could not mint a pairing code on $ssh_host"
         t3 environment link "$url" --pairing-code "$code" --access "$ACCESS"
+    else
+        say "here -> $url is linked and not due for renewal"
     fi
 
-    if ssh_t3 "$ssh_host" "environment list --json" </dev/null | jq -e --arg u "$self" 'any(.[].urls[]; . == $u)' >/dev/null; then
-        say "$ssh_host already links back here"
-    else
+    list=$(ssh_t3 "$ssh_host" "environment list --json" </dev/null) || die "could not list links on $ssh_host"
+    if needs_link "$list" "$self"; then
         say "Linking $ssh_host -> $self"
         code=$(mint_code "$ssh_host")
         print -r -- "$code" | ssh_t3 "$ssh_host" "environment link ${(q)self} --pairing-code \"\$code\" --access ${(q)ACCESS}"
+    else
+        say "$ssh_host -> here is linked and not due for renewal"
     fi
+}
+
+# Renew both directions with every linked machine reachable over SSH.
+cmd_renew() {
+    t3_bin >/dev/null || { say "t3 is not installed; nothing to renew"; return 0; }
+    local -a hosts
+    hosts=(${(f)"$(t3 environment list --json | jq -r '.[].urls[0] | sub("^https?://"; "") | sub(":[0-9]+$"; "")')"})
+    (( ${#hosts} )) || { say "no linked machines"; return 0; }
+    local host failed=0
+    for host in $hosts; do
+        link_host "$host" 1 || failed=1
+    done
+    return $failed
 }
 
 # Online tailnet machines (not phones) whose T3 Code port answers.
@@ -222,5 +258,6 @@ case ${1:-} in
     invite)  shift; cmd_invite "$@" ;;
     join)    shift; cmd_join "$@" ;;
     status)  shift; cmd_status "$@" ;;
-    *) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    renew)   shift; cmd_renew "$@" ;;
+    *) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

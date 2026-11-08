@@ -78,3 +78,14 @@ else
     log "setup failed (exit $?)"
     exit 1
 fi
+
+# T3 Code links expire after 30 days; once a day, re-link the ones due.
+renew_stamp="$LOG_DIR/t3-mesh-renew.stamp"
+if [[ ! -e $renew_stamp || -n $(find "$renew_stamp" -mmin +1380 2>/dev/null) ]]; then
+    touch "$renew_stamp"
+    if "$DOTFILES/bin/.local/bin/t3-mesh" renew >>"$LOG" 2>&1; then
+        log "t3-mesh renew ok"
+    else
+        log "t3-mesh renew: some links not checked or renewed"
+    fi
+fi
