@@ -47,6 +47,33 @@ Skills: `skills/` is linked into `~/.agents/skills` everywhere,
 `skills-private/` on private machines, and `~/.dotfiles-work/skills/` on work
 machines. `agents-skills-sync` also installs the npm-distributed skills.
 
+## T3 Code machines
+
+`t3-mesh` adds a machine to the T3 Code environments on the tailnet, so agents
+on each one can work on the others. T3 Code links are one-way, so it links
+every pair in both directions. On a new machine, after `setup` and
+`tailscale up`:
+
+```sh
+t3-mesh install      # t3 (nightly) plus its background service, reachable on the tailnet
+t3-mesh link --all   # link both ways with every tailnet machine running T3 Code, over SSH
+```
+
+For a machine you can't SSH to (the MacBook has Remote Login off), run
+`t3-mesh invite` there and the `t3-mesh join ...` command it prints here. `join`
+then prints the command that links back. `t3-mesh status` shows what is linked.
+Links default to `approval-required`; set `T3_MESH_ACCESS` to change that.
+
+T3 Code expires a link 30 days after it was made and never extends it, and a
+link can't mint its own replacement. So `dotfiles-sync` runs `t3-mesh renew`
+once a day: for each linked machine it can SSH to, it re-links both directions
+when either expires within 7 days (`T3_MESH_RENEW_DAYS`). One machine of each
+pair needs SSH to the other, and the key has to work without a prompt, since
+the timer runs unattended. The MacBook can't take SSH, so it renews its links
+to this box by SSHing in: give it `User root` for `dragon-server` in
+`~/.ssh/config`, or set `T3_MESH_SSH_USER`. Results go to
+`~/.local/state/dotfiles-sync.log`.
+
 ## The work repo
 
 Work material never goes in this public repo. Clone the private
