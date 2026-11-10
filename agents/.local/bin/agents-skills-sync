@@ -30,6 +30,8 @@ npx skills@latest add mattpocock/skills -g -y --skill ${MAT_SKILLS[@]} >/dev/nul
 
 npx skills@latest add backnotprop/pstack -g -y --skill unslop >/dev/null
 
+npx skills@latest add anthropics/skills -g -y --skill frontend-design >/dev/null
+
 npx impeccable install >/dev/null 2>&1 || echo "impeccable install skipped (needs manual run)" >&2
 
 # Match agents-sync: Claude reads skills from its config dir, not always ~/.claude.
